@@ -6,7 +6,7 @@ A beginner-friendly mental wellness chatbot with:
 - Flask backend
 - Hugging Face Transformers
 - Local model loading
-- No Hugging Face API key
+- NO Hugging Face API key
 - Basic safety keyword layer
 
 ## Architecture
