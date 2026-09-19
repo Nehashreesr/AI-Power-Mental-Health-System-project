@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import "./App.css";
 
@@ -9,6 +10,7 @@ import VoiceEmotion from "./VoiceEmotion";
 import AIWellness from "./AIWellness";
 import Settings from "./Settings";
 import Profile from "./Profile";
+import SafetySupport from "./SafetySupport";
 
 import Login from "./Login";
 import { signOut } from "firebase/auth";
@@ -21,6 +23,7 @@ const defaultProfile = {
 };
 
 function App() {
+
   // =========================================
   // LOGIN STATUS
   // =========================================
@@ -40,24 +43,29 @@ function App() {
   // =========================================
 
   const [profile, setProfile] = useState(() => {
+
     const savedProfile =
       localStorage.getItem("mindcareProfile");
 
     if (savedProfile) {
+
       try {
+
         const data = JSON.parse(savedProfile);
 
         return {
           name: data.name || "User",
-          email:
-            data.email || "user@example.com",
+          email: data.email || "user@example.com",
           photo: data.photo || ""
         };
+
       } catch (error) {
+
         console.error(
           "Error loading profile:",
           error
         );
+
       }
     }
 
@@ -77,6 +85,7 @@ function App() {
   // =========================================
 
   useEffect(() => {
+
     document.body.classList.toggle(
       "dark-mode",
       darkMode
@@ -86,6 +95,7 @@ function App() {
       "mindcareTheme",
       darkMode ? "dark" : "light"
     );
+
   }, [darkMode]);
 
   // =========================================
@@ -93,28 +103,34 @@ function App() {
   // =========================================
 
   const loadProfile = () => {
+
     const savedProfile =
       localStorage.getItem("mindcareProfile");
 
     if (!savedProfile) {
+
       setProfile(defaultProfile);
       return;
+
     }
 
     try {
+
       const data = JSON.parse(savedProfile);
 
       setProfile({
         name: data.name || "User",
-        email:
-          data.email || "user@example.com",
+        email: data.email || "user@example.com",
         photo: data.photo || ""
       });
+
     } catch (error) {
+
       console.error(
         "Error loading profile:",
         error
       );
+
     }
   };
 
@@ -123,21 +139,25 @@ function App() {
   // =========================================
 
   useEffect(() => {
+
     loadProfile();
 
     const handleProfileUpdate = (event) => {
+
       if (event.detail) {
+
         setProfile({
-          name:
-            event.detail.name || "User",
+          name: event.detail.name || "User",
           email:
             event.detail.email ||
             "user@example.com",
-          photo:
-            event.detail.photo || ""
+          photo: event.detail.photo || ""
         });
+
       } else {
+
         loadProfile();
+
       }
     };
 
@@ -152,6 +172,7 @@ function App() {
     );
 
     return () => {
+
       window.removeEventListener(
         "mindcareProfileUpdated",
         handleProfileUpdate
@@ -161,7 +182,9 @@ function App() {
         "storage",
         loadProfile
       );
+
     };
+
   }, []);
 
   // =========================================
@@ -169,12 +192,14 @@ function App() {
   // =========================================
 
   const handleLogin = (user) => {
+
     localStorage.setItem(
       "mindcareLoggedIn",
       "true"
     );
 
     if (user) {
+
       const existingProfile =
         localStorage.getItem(
           "mindcareProfile"
@@ -183,15 +208,21 @@ function App() {
       let oldProfile = {};
 
       if (existingProfile) {
+
         try {
+
           oldProfile =
             JSON.parse(existingProfile);
+
         } catch {
+
           oldProfile = {};
+
         }
       }
 
       const updatedProfile = {
+
         name:
           user.displayName ||
           oldProfile.name ||
@@ -206,6 +237,7 @@ function App() {
           user.photoURL ||
           oldProfile.photo ||
           ""
+
       };
 
       localStorage.setItem(
@@ -223,10 +255,12 @@ function App() {
           }
         )
       );
+
     }
 
     setIsLoggedIn(true);
     setPage("dashboard");
+
   };
 
   // =========================================
@@ -234,13 +268,18 @@ function App() {
   // =========================================
 
   const handleLogout = async () => {
+
     try {
+
       await signOut(auth);
+
     } catch (error) {
+
       console.error(
         "Logout error:",
         error
       );
+
     }
 
     localStorage.removeItem(
@@ -249,6 +288,7 @@ function App() {
 
     setIsLoggedIn(false);
     setPage("dashboard");
+
   };
 
   // =========================================
@@ -256,9 +296,11 @@ function App() {
   // =========================================
 
   const toggleTheme = () => {
+
     setDarkMode(
       (previousMode) => !previousMode
     );
+
   };
 
   // =========================================
@@ -270,7 +312,9 @@ function App() {
     text,
     pageName
   }) => {
+
     return (
+
       <button
         type="button"
         className={
@@ -282,13 +326,19 @@ function App() {
           setPage(pageName)
         }
       >
+
         <span className="side-button-icon">
           {icon}
         </span>
 
-        <span>{text}</span>
+        <span>
+          {text}
+        </span>
+
       </button>
+
     );
+
   };
 
   // =========================================
@@ -296,17 +346,21 @@ function App() {
   // =========================================
 
   const getProfileInitial = () => {
+
     if (
       !profile.name ||
       !profile.name.trim()
     ) {
+
       return "U";
+
     }
 
     return profile.name
       .trim()
       .charAt(0)
       .toUpperCase();
+
   };
 
   // =========================================
@@ -314,11 +368,13 @@ function App() {
   // =========================================
 
   if (!isLoggedIn) {
+
     return (
       <Login
         onLogin={handleLogin}
       />
     );
+
   }
 
   // =========================================
@@ -326,6 +382,7 @@ function App() {
   // =========================================
 
   return (
+
     <div
       className={
         darkMode
@@ -340,7 +397,9 @@ function App() {
 
       <aside className="sidebar">
 
-        {/* LOGO */}
+        {/* =====================================
+            LOGO
+        ===================================== */}
 
         <div className="sidebar-logo">
           🧠
@@ -375,14 +434,18 @@ function App() {
           <div className="sidebar-profile-avatar">
 
             {profile.photo ? (
+
               <img
                 src={profile.photo}
                 alt="Profile"
               />
+
             ) : (
+
               <span>
                 {getProfileInitial()}
               </span>
+
             )}
 
           </div>
@@ -411,81 +474,100 @@ function App() {
         </button>
 
         {/* =====================================
-            MENU
+            SCROLLABLE SIDEBAR AREA
+            MENU + SETTINGS
         ===================================== */}
 
-        <div className="sidebar-menu">
+        <div className="sidebar-scroll-area">
 
-          <SideButton
-            icon="🏠"
-            text="Dashboard"
-            pageName="dashboard"
-          />
+          {/* =====================================
+              MENU
+          ===================================== */}
 
-          <SideButton
-            icon="💬"
-            text="Chat AI"
-            pageName="chat"
-          />
+          <div className="sidebar-menu">
 
-          <SideButton
-            icon="📊"
-            text="Mood Tracker"
-            pageName="mood"
-          />
+            <SideButton
+              icon="🏠"
+              text="Dashboard"
+              pageName="dashboard"
+            />
 
-          <SideButton
-            icon="📈"
-            text="Mood Analytics"
-            pageName="analytics"
-          />
+            <SideButton
+              icon="💬"
+              text="Chat AI"
+              pageName="chat"
+            />
 
-          <SideButton
-            icon="🎤"
-            text="Voice Emotion"
-            pageName="voice"
-          />
+            <SideButton
+              icon="📊"
+              text="Mood Tracker"
+              pageName="mood"
+            />
 
-          <SideButton
-            icon="🤖"
-            text="AI Wellness"
-            pageName="wellness"
-          />
+            <SideButton
+              icon="📈"
+              text="Mood Analytics"
+              pageName="analytics"
+            />
 
-        </div>
+            <SideButton
+              icon="🎤"
+              text="Voice Emotion"
+              pageName="voice"
+            />
 
-        {/* =====================================
-            SETTINGS
-        ===================================== */}
+            <SideButton
+              icon="🤖"
+              text="AI Wellness"
+              pageName="wellness"
+            />
 
-        <div className="sidebar-settings">
+            {/* SAFETY SUPPORT */}
 
-          <button
-            type="button"
-            className={
-              page === "settings"
-                ? "side-button settings-button active"
-                : "side-button settings-button"
-            }
-            onClick={() =>
-              setPage("settings")
-            }
-          >
+            <SideButton
+              icon="🛡️"
+              text="Safety Support"
+              pageName="safety"
+            />
 
-            <span className="side-button-icon">
-              ⚙️
-            </span>
+          </div>
 
-            <span>
-              Settings
-            </span>
+          {/* =====================================
+              SETTINGS
+              NOW INSIDE SCROLL AREA
+          ===================================== */}
 
-          </button>
+          <div className="sidebar-settings">
+
+            <button
+              type="button"
+              className={
+                page === "settings"
+                  ? "side-button settings-button active"
+                  : "side-button settings-button"
+              }
+              onClick={() =>
+                setPage("settings")
+              }
+            >
+
+              <span className="side-button-icon">
+                ⚙️
+              </span>
+
+              <span>
+                Settings
+              </span>
+
+            </button>
+
+          </div>
 
         </div>
 
         {/* =====================================
             SIDEBAR BOTTOM
+            STAYS AT BOTTOM
         ===================================== */}
 
         <div className="sidebar-bottom">
@@ -534,6 +616,16 @@ function App() {
           <AIWellness />
         )}
 
+        {/* SAFETY SUPPORT */}
+
+        {page === "safety" && (
+          <SafetySupport
+            onBackToChat={() =>
+              setPage("chat")
+            }
+          />
+        )}
+
         {page === "settings" && (
           <Settings
             darkMode={darkMode}
@@ -545,7 +637,9 @@ function App() {
       </main>
 
     </div>
+
   );
 }
 
 export default App;
+
