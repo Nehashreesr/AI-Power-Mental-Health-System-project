@@ -278,6 +278,245 @@ def get_user(firebase_uid):
 
 
 # =====================================================
+# GET TRUSTED CONTACT
+# =====================================================
+
+@app.route("/users/<firebase_uid>/trusted-contact", methods=["GET"])
+def get_trusted_contact(firebase_uid):
+
+    connection = None
+    cursor = None
+
+    try:
+
+        connection = get_db_connection()
+
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT
+                trusted_contact
+            FROM users
+            WHERE firebase_uid = %s
+        """, (firebase_uid,))
+
+        row = cursor.fetchone()
+
+        if not row:
+
+            return jsonify({
+                "success": False,
+                "error": "User not found"
+            }), 404
+
+        trusted_contact = row[0] or ""
+
+        return jsonify({
+            "success": True,
+            "trusted_contact": trusted_contact
+        })
+
+    except Exception as e:
+
+        print(
+            "TRUSTED CONTACT GET ERROR:",
+            str(e)
+        )
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
+
+
+# =====================================================
+# SAVE / UPDATE TRUSTED CONTACT
+# =====================================================
+
+@app.route("/users/<firebase_uid>/trusted-contact", methods=["PUT"])
+def save_trusted_contact(firebase_uid):
+
+    connection = None
+    cursor = None
+
+    try:
+
+        data = request.get_json() or {}
+
+        trusted_contact = data.get(
+            "trusted_contact",
+            ""
+        )
+
+        # -------------------------------------------------
+        # CLEAN PHONE NUMBER
+        # -------------------------------------------------
+
+        trusted_contact = str(
+            trusted_contact
+        ).strip()
+
+        if not trusted_contact:
+
+            return jsonify({
+                "success": False,
+                "error": "Trusted contact is required"
+            }), 400
+
+        # -------------------------------------------------
+        # CONNECT DATABASE
+        # -------------------------------------------------
+
+        connection = get_db_connection()
+
+        cursor = connection.cursor()
+
+        # -------------------------------------------------
+        # CHECK USER EXISTS
+        # -------------------------------------------------
+
+        cursor.execute("""
+            SELECT id
+            FROM users
+            WHERE firebase_uid = %s
+        """, (firebase_uid,))
+
+        user = cursor.fetchone()
+
+        if not user:
+
+            return jsonify({
+                "success": False,
+                "error": "User not found"
+            }), 404
+
+        # -------------------------------------------------
+        # UPDATE TRUSTED CONTACT
+        # -------------------------------------------------
+
+        cursor.execute("""
+            UPDATE users
+            SET trusted_contact = %s
+            WHERE firebase_uid = %s
+        """, (
+            trusted_contact,
+            firebase_uid
+        ))
+
+        connection.commit()
+
+        print("\n================================")
+        print("TRUSTED CONTACT SAVED")
+        print("================================")
+        print("User:", firebase_uid)
+        print("Trusted Contact:", trusted_contact)
+        print("================================\n")
+
+        return jsonify({
+            "success": True,
+            "message": "Trusted contact saved successfully",
+            "trusted_contact": trusted_contact
+        })
+
+    except Exception as e:
+
+        if connection:
+            connection.rollback()
+
+        print(
+            "TRUSTED CONTACT SAVE ERROR:",
+            str(e)
+        )
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
+
+
+# =====================================================
+# DELETE TRUSTED CONTACT
+# =====================================================
+
+@app.route("/users/<firebase_uid>/trusted-contact", methods=["DELETE"])
+def delete_trusted_contact(firebase_uid):
+
+    connection = None
+    cursor = None
+
+    try:
+
+        connection = get_db_connection()
+
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            UPDATE users
+            SET trusted_contact = NULL
+            WHERE firebase_uid = %s
+        """, (firebase_uid,))
+
+        if cursor.rowcount == 0:
+
+            return jsonify({
+                "success": False,
+                "error": "User not found"
+            }), 404
+
+        connection.commit()
+
+        print("\n================================")
+        print("TRUSTED CONTACT DELETED")
+        print("================================")
+        print("User:", firebase_uid)
+        print("================================\n")
+
+        return jsonify({
+            "success": True,
+            "message": "Trusted contact deleted successfully"
+        })
+
+    except Exception as e:
+
+        if connection:
+            connection.rollback()
+
+        print(
+            "TRUSTED CONTACT DELETE ERROR:",
+            str(e)
+        )
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
+
+
+# =====================================================
 # SAVE MOOD
 # =====================================================
 
@@ -1024,6 +1263,7 @@ if __name__ == "__main__":
     print("User Database: Enabled")
     print("Mood Database: Enabled")
     print("Chat Database: Enabled")
+    print("Trusted Contact Database: Enabled")
     print("Port: 5000")
     print("================================\n")
 
