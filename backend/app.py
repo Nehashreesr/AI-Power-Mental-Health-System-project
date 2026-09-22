@@ -356,10 +356,6 @@ def save_trusted_contact(firebase_uid):
             ""
         )
 
-        # -------------------------------------------------
-        # CLEAN PHONE NUMBER
-        # -------------------------------------------------
-
         trusted_contact = str(
             trusted_contact
         ).strip()
@@ -371,17 +367,9 @@ def save_trusted_contact(firebase_uid):
                 "error": "Trusted contact is required"
             }), 400
 
-        # -------------------------------------------------
-        # CONNECT DATABASE
-        # -------------------------------------------------
-
         connection = get_db_connection()
 
         cursor = connection.cursor()
-
-        # -------------------------------------------------
-        # CHECK USER EXISTS
-        # -------------------------------------------------
 
         cursor.execute("""
             SELECT id
@@ -397,10 +385,6 @@ def save_trusted_contact(firebase_uid):
                 "success": False,
                 "error": "User not found"
             }), 404
-
-        # -------------------------------------------------
-        # UPDATE TRUSTED CONTACT
-        # -------------------------------------------------
 
         cursor.execute("""
             UPDATE users
@@ -517,6 +501,174 @@ def delete_trusted_contact(firebase_uid):
 
 
 # =====================================================
+# GET NOTIFICATION SETTING
+# =====================================================
+
+@app.route("/users/<firebase_uid>/notifications", methods=["GET"])
+def get_notifications(firebase_uid):
+
+    connection = None
+    cursor = None
+
+    try:
+
+        connection = get_db_connection()
+
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT
+                notifications_enabled
+            FROM users
+            WHERE firebase_uid = %s
+        """, (firebase_uid,))
+
+        row = cursor.fetchone()
+
+        if not row:
+
+            return jsonify({
+                "success": False,
+                "error": "User not found"
+            }), 404
+
+        notifications_enabled = row[0]
+
+        # If database value is NULL,
+        # use TRUE as default.
+        if notifications_enabled is None:
+            notifications_enabled = True
+
+        return jsonify({
+            "success": True,
+            "notifications_enabled": notifications_enabled
+        })
+
+    except Exception as e:
+
+        print(
+            "NOTIFICATION GET ERROR:",
+            str(e)
+        )
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
+
+
+# =====================================================
+# SAVE / UPDATE NOTIFICATION SETTING
+# =====================================================
+
+@app.route("/users/<firebase_uid>/notifications", methods=["PUT"])
+def save_notifications(firebase_uid):
+
+    connection = None
+    cursor = None
+
+    try:
+
+        data = request.get_json() or {}
+
+        notifications_enabled = data.get(
+            "notifications_enabled",
+            True
+        )
+
+        # Convert value to boolean
+        notifications_enabled = bool(
+            notifications_enabled
+        )
+
+        connection = get_db_connection()
+
+        cursor = connection.cursor()
+
+        # -------------------------------------------------
+        # CHECK USER EXISTS
+        # -------------------------------------------------
+
+        cursor.execute("""
+            SELECT id
+            FROM users
+            WHERE firebase_uid = %s
+        """, (firebase_uid,))
+
+        user = cursor.fetchone()
+
+        if not user:
+
+            return jsonify({
+                "success": False,
+                "error": "User not found"
+            }), 404
+
+        # -------------------------------------------------
+        # UPDATE NOTIFICATION SETTING
+        # -------------------------------------------------
+
+        cursor.execute("""
+            UPDATE users
+            SET notifications_enabled = %s
+            WHERE firebase_uid = %s
+        """, (
+            notifications_enabled,
+            firebase_uid
+        ))
+
+        connection.commit()
+
+        print("\n================================")
+        print("NOTIFICATION SETTING SAVED")
+        print("================================")
+        print("User:", firebase_uid)
+        print(
+            "Notifications:",
+            notifications_enabled
+        )
+        print("================================\n")
+
+        return jsonify({
+            "success": True,
+            "message": "Notification setting saved successfully",
+            "notifications_enabled":
+                notifications_enabled
+        })
+
+    except Exception as e:
+
+        if connection:
+            connection.rollback()
+
+        print(
+            "NOTIFICATION SAVE ERROR:",
+            str(e)
+        )
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
+
+
+# =====================================================
 # SAVE MOOD
 # =====================================================
 
@@ -536,20 +688,12 @@ def save_mood():
         source = data.get("source", "mood")
         confidence = data.get("confidence")
 
-        # -------------------------------------------------
-        # CHECK FIREBASE UID
-        # -------------------------------------------------
-
         if not firebase_uid:
 
             return jsonify({
                 "success": False,
                 "error": "Firebase UID is required"
             }), 400
-
-        # -------------------------------------------------
-        # CHECK MOOD
-        # -------------------------------------------------
 
         if not mood:
 
@@ -558,17 +702,9 @@ def save_mood():
                 "error": "Mood is required"
             }), 400
 
-        # -------------------------------------------------
-        # CONNECT DATABASE
-        # -------------------------------------------------
-
         connection = get_db_connection()
 
         cursor = connection.cursor()
-
-        # -------------------------------------------------
-        # SAVE MOOD
-        # -------------------------------------------------
 
         cursor.execute("""
             INSERT INTO mood_entries
@@ -780,10 +916,6 @@ def chat():
             []
         )
 
-        # -------------------------------------------------
-        # EMPTY MESSAGE CHECK
-        # -------------------------------------------------
-
         if not user_message:
 
             return jsonify({
@@ -811,10 +943,6 @@ def chat():
             user_message,
             chat_history
         )
-
-        # -------------------------------------------------
-        # RETURN AI RESPONSE
-        # -------------------------------------------------
 
         return jsonify({
             "success": True,
@@ -921,14 +1049,11 @@ def save_chat_message():
         firebase_uid = data.get("firebase_uid")
         role = data.get("role")
         content = data.get("content")
+
         message_type = data.get(
             "message_type",
             "ai"
         )
-
-        # -------------------------------------------------
-        # CHECK REQUIRED DATA
-        # -------------------------------------------------
 
         if not firebase_uid:
 
@@ -951,17 +1076,9 @@ def save_chat_message():
                 "error": "Content is required"
             }), 400
 
-        # -------------------------------------------------
-        # CONNECT DATABASE
-        # -------------------------------------------------
-
         connection = get_db_connection()
 
         cursor = connection.cursor()
-
-        # -------------------------------------------------
-        # SAVE MESSAGE
-        # -------------------------------------------------
 
         cursor.execute("""
             INSERT INTO chat_messages
@@ -1264,6 +1381,7 @@ if __name__ == "__main__":
     print("Mood Database: Enabled")
     print("Chat Database: Enabled")
     print("Trusted Contact Database: Enabled")
+    print("Notification Database: Enabled")
     print("Port: 5000")
     print("================================\n")
 

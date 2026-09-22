@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import "./App.css";
 
@@ -87,12 +86,13 @@ function AIWellness() {
   };
 
   // =========================================
-  // FIREBASE AUTH LISTENER
+  // FIREBASE AUTH + MOOD UPDATE LISTENER
   // =========================================
 
   useEffect(() => {
     const auth = getAuth();
 
+    // Firebase login listener
     const unsubscribe =
       onAuthStateChanged(
         auth,
@@ -101,8 +101,33 @@ function AIWellness() {
         }
       );
 
+    // Refresh AI Wellness when a new mood
+    // is saved from Mood Tracker or Voice Emotion
+    const handleMoodUpdated = () => {
+      const user = auth.currentUser;
+
+      if (user) {
+        console.log(
+          "AI Wellness: New mood detected. Reloading..."
+        );
+
+        loadLatestMood(user);
+      }
+    };
+
+    window.addEventListener(
+      "moodUpdated",
+      handleMoodUpdated
+    );
+
+    // Cleanup listeners
     return () => {
       unsubscribe();
+
+      window.removeEventListener(
+        "moodUpdated",
+        handleMoodUpdated
+      );
     };
   }, []);
 
@@ -111,7 +136,6 @@ function AIWellness() {
   // =========================================
 
   const recommendations = {
-
     Happy: {
       emoji: "😊",
       title: "You're feeling happy!",
@@ -391,9 +415,7 @@ function AIWellness() {
 
       </div>
 
-      {/* =====================================
-          NO MOOD
-      ===================================== */}
+      {/* NO MOOD */}
 
       {!latestMood && (
 
@@ -416,9 +438,7 @@ function AIWellness() {
 
       )}
 
-      {/* =====================================
-          MOOD FOUND BUT UNKNOWN
-      ===================================== */}
+      {/* MOOD FOUND BUT UNKNOWN */}
 
       {latestMood && !recommendation && (
 
@@ -451,9 +471,7 @@ function AIWellness() {
 
       )}
 
-      {/* =====================================
-          RECOMMENDATIONS
-      ===================================== */}
+      {/* RECOMMENDATIONS */}
 
       {latestMood && recommendation && (
 
@@ -464,9 +482,7 @@ function AIWellness() {
           <div className="current-mood-card">
 
             <div className="current-mood-emoji">
-
               {recommendation.emoji}
-
             </div>
 
             <div>
@@ -481,15 +497,12 @@ function AIWellness() {
               </h2>
 
               <p>
-
                 Detected from{" "}
-
                 <strong>
                   {latestMood.source === "voice"
                     ? "Voice Emotion"
                     : "Mood Tracker"}
                 </strong>
-
               </p>
 
               {latestMood.created_at && (
@@ -620,4 +633,3 @@ function AIWellness() {
 }
 
 export default AIWellness;
-
