@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import "./SafetySupport.css";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -33,19 +32,12 @@ function SafetySupport({ onBackToChat }) {
       const data = await response.json();
 
       if (data.success) {
-        setTrustedContact(
-          data.trusted_contact || ""
-        );
+        setTrustedContact(data.trusted_contact || "");
       } else {
         setTrustedContact("");
       }
-
     } catch (error) {
-      console.error(
-        "LOAD TRUSTED CONTACT ERROR:",
-        error
-      );
-
+      console.error("LOAD TRUSTED CONTACT ERROR:", error);
       setTrustedContact("");
     } finally {
       setLoading(false);
@@ -59,18 +51,14 @@ function SafetySupport({ onBackToChat }) {
   useEffect(() => {
     const auth = getAuth();
 
-    const unsubscribe =
-      onAuthStateChanged(
-        auth,
-        (user) => {
-          if (user) {
-            loadTrustedContact(user);
-          } else {
-            setTrustedContact("");
-            setLoading(false);
-          }
-        }
-      );
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        loadTrustedContact(user);
+      } else {
+        setTrustedContact("");
+        setLoading(false);
+      }
+    });
 
     return () => unsubscribe();
   }, []);
@@ -79,9 +67,7 @@ function SafetySupport({ onBackToChat }) {
   // SAVE TRUSTED CONTACT TO DATABASE
   // =========================================
 
-  const saveTrustedContact = async (
-    number
-  ) => {
+  const saveTrustedContact = async (number) => {
     try {
       const user = getCurrentUser();
 
@@ -107,24 +93,17 @@ function SafetySupport({ onBackToChat }) {
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.error ||
-            "Failed to save trusted contact"
+          data.error || "Failed to save trusted contact"
         );
       }
 
       setTrustedContact(number);
 
       return true;
-
     } catch (error) {
-      console.error(
-        "SAVE TRUSTED CONTACT ERROR:",
-        error
-      );
+      console.error("SAVE TRUSTED CONTACT ERROR:", error);
 
-      alert(
-        "Could not save trusted contact."
-      );
+      alert("Could not save trusted contact.");
 
       return false;
     }
@@ -135,7 +114,23 @@ function SafetySupport({ onBackToChat }) {
   // =========================================
 
   const handleEmergency = () => {
-    window.location.href = "tel:112";
+    // Detect whether the user is using a mobile device
+    const isMobile =
+      /Android|iPhone|iPad|iPod/i.test(
+        navigator.userAgent
+      );
+
+    if (isMobile) {
+      // Mobile → open phone dialer
+      window.location.href = "tel:112";
+    } else {
+      // Laptop/Desktop → cannot directly make phone call
+      alert(
+        "Emergency Number: 112\n\n" +
+        "You are using MindCare AI on a laptop or desktop.\n\n" +
+        "Please use a mobile phone to call 112."
+      );
+    }
   };
 
   // =========================================
@@ -147,17 +142,15 @@ function SafetySupport({ onBackToChat }) {
 
     // Ask for number if not already saved
     if (!number) {
-      const enteredNumber =
-        window.prompt(
-          "Enter your trusted contact's WhatsApp number with country code.\nExample: +91 9876543210"
-        );
+      const enteredNumber = window.prompt(
+        "Enter your trusted contact's WhatsApp number with country code.\nExample: +91 9876543210"
+      );
 
       if (!enteredNumber) {
         return;
       }
 
-      number =
-        enteredNumber.replace(/\D/g, "");
+      number = enteredNumber.replace(/\D/g, "");
 
       if (!number) {
         alert(
@@ -167,8 +160,7 @@ function SafetySupport({ onBackToChat }) {
       }
 
       // Save to PostgreSQL
-      const saved =
-        await saveTrustedContact(number);
+      const saved = await saveTrustedContact(number);
 
       if (!saved) {
         return;
@@ -199,10 +191,9 @@ function SafetySupport({ onBackToChat }) {
   // =========================================
 
   const changeTrustedContact = async () => {
-    const enteredNumber =
-      window.prompt(
-        "Enter the new trusted contact's WhatsApp number with country code.\nExample: +91 9876543210"
-      );
+    const enteredNumber = window.prompt(
+      "Enter the new trusted contact's WhatsApp number with country code.\nExample: +91 9876543210"
+    );
 
     if (!enteredNumber) {
       return;
@@ -218,10 +209,9 @@ function SafetySupport({ onBackToChat }) {
       return;
     }
 
-    const saved =
-      await saveTrustedContact(
-        cleanedNumber
-      );
+    const saved = await saveTrustedContact(
+      cleanedNumber
+    );
 
     if (saved) {
       alert(
@@ -268,7 +258,7 @@ function SafetySupport({ onBackToChat }) {
           <span>📞</span>
 
           <span>
-            Contact Emergency Services
+            Contact Emergency Services — 112
           </span>
         </button>
 
@@ -295,9 +285,7 @@ function SafetySupport({ onBackToChat }) {
           <button
             type="button"
             className="change-contact-button"
-            onClick={
-              changeTrustedContact
-            }
+            onClick={changeTrustedContact}
           >
             Change Trusted Contact
           </button>
@@ -338,4 +326,3 @@ function SafetySupport({ onBackToChat }) {
 }
 
 export default SafetySupport;
-

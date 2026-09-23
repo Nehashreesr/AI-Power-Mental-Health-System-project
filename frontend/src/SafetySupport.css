@@ -148,3 +148,254 @@
   }
 }
 
+/* =========================================
+   TRUSTED CONTACT CARD
+========================================= */
+
+.trusted-contact-card {
+  width: 100%;
+  margin: 18px 0;
+  padding: 22px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(120, 100, 200, 0.15);
+  box-sizing: border-box;
+}
+
+.trusted-contact-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.trusted-contact-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(100, 90, 220, 0.1);
+  font-size: 22px;
+}
+
+.trusted-contact-header h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  color: #25233a;
+}
+
+.trusted-contact-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #77748a;
+}
+
+/* =========================================
+   EMPTY CONTACT
+========================================= */
+
+.trusted-empty {
+  text-align: center;
+  padding: 18px 10px;
+}
+
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f2f1fa;
+  font-size: 22px;
+}
+
+.trusted-empty p {
+  margin: 0 0 16px;
+  color: #77748a;
+  font-size: 14px;
+}
+
+.add-contact-button {
+  border: none;
+  padding: 11px 18px;
+  border-radius: 10px;
+  background: #6557d9;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.add-contact-button:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+}
+
+/* =========================================
+   CONTACT FORM
+========================================= */
+
+.contact-form {
+  padding: 18px;
+  border-radius: 14px;
+  background: #f8f7fc;
+}
+
+.contact-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #38354d;
+}
+
+.contact-form input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #ddd9ec;
+  border-radius: 10px;
+  background: white;
+  color: #29263d;
+  font-size: 14px;
+  outline: none;
+}
+
+.contact-form input:focus {
+  border-color: #6557d9;
+  box-shadow: 0 0 0 3px rgba(101, 87, 217, 0.1);
+}
+
+.contact-form small {
+  display: block;
+  margin-top: 7px;
+  color: #8a8798;
+  font-size: 11px;
+}
+
+.contact-form-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.save-contact-button,
+.cancel-contact-button {
+  flex: 1;
+  padding: 11px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save-contact-button {
+  border: none;
+  background: #6557d9;
+  color: white;
+}
+
+.save-contact-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancel-contact-button {
+  border: 1px solid #ddd9ec;
+  background: white;
+  color: #5e5a70;
+}
+
+/* =========================================
+   SAVED CONTACT
+========================================= */
+
+.saved-contact {
+  padding-top: 4px;
+}
+
+.saved-contact-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #36a269;
+  flex-shrink: 0;
+}
+
+.saved-contact-info div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.saved-label {
+  font-size: 11px;
+  color: #858192;
+}
+
+.saved-contact-info strong {
+  font-size: 15px;
+  color: #302d43;
+}
+
+.whatsapp-button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: #35a866;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.whatsapp-button:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+}
+
+.change-contact-button {
+  display: block;
+  margin: 11px auto 0;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  color: #6557d9;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.change-contact-button:hover {
+  text-decoration: underline;
+}
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 600px) {
+
+  .trusted-contact-card {
+    padding: 17px;
+  }
+
+  .contact-form-buttons {
+    flex-direction: column;
+  }
+
+}
