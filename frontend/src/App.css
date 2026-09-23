@@ -3814,6 +3814,14 @@ footer p {
   background: linear-gradient(135deg, #fce7f3, #f9a8d4);
 }
 
+.mood-option:nth-child(6) {
+    background: linear-gradient(135deg, #f0aead, #df7373);
+}
+
+.mood-option:nth-child(7) {
+    background: linear-gradient(135deg, #c19be3, #c2a1e1);
+}
+
 .mood-option:hover {
   transform: translateY(-8px) scale(1.03);
   box-shadow: 0 12px 25px rgba(99, 102, 241, 0.18);
@@ -7774,7 +7782,7 @@ footer p {
 
 
 
-```css
+
 /* =========================================
    PROFILE PAGE
 ========================================= */
@@ -8353,7 +8361,7 @@ footer p {
 
   object-fit: cover;
 
-  object-position: center;
+  object-position: center 18%;
 
   border-radius: 50%;
 }
@@ -8560,3 +8568,47 @@ footer p {
 .sidebar-scroll-area::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 110, 150, 0.55);
 }
+
+
+
+/* =================================
+   MOOD OPTION COLORS
+================================= */
+
+.mood-option {
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.mood-option:hover {
+  border-color: var(--mood-color);
+  background: color-mix(
+    in srgb,
+    var(--mood-color) 10%,
+    transparent
+  );
+}
+
+.mood-option.selected {
+  border-color: var(--mood-color);
+  background: color-mix(
+    in srgb,
+    var(--mood-color) 15%,
+    transparent
+  );
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.10);
+}
+
+
+/* =================================
+   PREVIOUS MOOD COLORS
+================================= */
+
+.previous-mood-item {
+  border-left: 4px solid var(--mood-color);
+}
+
+.previous-mood-item strong {
+  color: var(--mood-color);
+}
+

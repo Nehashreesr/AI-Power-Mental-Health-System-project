@@ -1,7 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState
+} from "react";
+
 import "./App.css";
 
-const API_URL = "http://127.0.0.1:5000";
+const API_URL =
+  "http://127.0.0.1:5000";
 
 const welcomeMessage = {
   role: "assistant",
@@ -10,186 +16,450 @@ const welcomeMessage = {
 };
 
 function Chatbot() {
-  const [messages, setMessages] = useState([welcomeMessage]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [listening, setListening] = useState(false);
 
-  const chatEndRef = useRef(null);
-  const inputRef = useRef(null);
-  const recognitionRef = useRef(null);
+  const [messages, setMessages] =
+    useState([welcomeMessage]);
+
+  const [input, setInput] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [listening, setListening] =
+    useState(false);
+
+
+  const chatEndRef =
+    useRef(null);
+
+  const inputRef =
+    useRef(null);
+
+  const recognitionRef =
+    useRef(null);
+
 
   /* =========================
      AUTO SCROLL
   ========================= */
+
   useEffect(() => {
+
     chatEndRef.current?.scrollIntoView({
       behavior: "smooth"
     });
+
   }, [messages, loading]);
+
 
   /* =========================
      SEND MESSAGE
   ========================= */
-  const sendMessage = async (customMessage = null) => {
-    const text = (customMessage ?? input).trim();
 
-    if (!text || loading) return;
+  const sendMessage =
+    async (customMessage = null) => {
 
-    const userMessage = {
-      role: "user",
-      content: text
-    };
+      const text =
+        (customMessage ?? input).trim();
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setLoading(true);
-
-    try {
-      const response = await fetch(`${API_URL}/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: text,
-          history: messages.slice(-6)
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Backend error");
+      if (!text || loading) {
+        return;
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.reply || "I'm here to listen.",
-          type: data.type || "ai"
-        }
-      ]);
-    } catch (error) {
-      console.error("Chat error:", error);
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            "I'm having trouble connecting to MindCare AI. Please make sure the Flask backend is running.",
-          type: "error"
-        }
+      // -----------------------------------------
+      // SAVE CURRENT CHAT HISTORY
+      // -----------------------------------------
+
+      const chatHistory =
+        messages.slice(-6);
+
+
+      // -----------------------------------------
+      // CREATE USER MESSAGE
+      // -----------------------------------------
+
+      const userMessage = {
+        role: "user",
+        content: text
+      };
+
+
+      // -----------------------------------------
+      // UPDATE UI IMMEDIATELY
+      // -----------------------------------------
+
+      setMessages((previous) => [
+        ...previous,
+        userMessage
       ]);
-    } finally {
-      setLoading(false);
+
+      setInput("");
+
+      setLoading(true);
+
+
+      // -----------------------------------------
+      // KEEP INPUT READY
+      // -----------------------------------------
 
       setTimeout(() => {
         inputRef.current?.focus();
-      }, 100);
-    }
-  };
+      }, 0);
+
+
+      try {
+
+        const response =
+          await fetch(
+            `${API_URL}/chat`,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body: JSON.stringify({
+                message: text,
+                history: chatHistory
+              })
+            }
+          );
+
+
+        const data =
+          await response.json();
+
+
+        if (
+          !response.ok ||
+          !data.success &&
+          !data.reply
+        ) {
+
+          throw new Error(
+            data.error ||
+            "Backend error"
+          );
+        }
+
+
+        // -----------------------------------------
+        // SHOW AI RESPONSE
+        // -----------------------------------------
+
+        const assistantMessage = {
+          role: "assistant",
+          content:
+            data.reply ||
+            "I'm here to listen.",
+          type:
+            data.type || "ai"
+        };
+
+
+        setMessages((previous) => [
+          ...previous,
+          assistantMessage
+        ]);
+
+      } catch (error) {
+
+        console.error(
+          "Chat error:",
+          error
+        );
+
+
+        setMessages((previous) => [
+          ...previous,
+          {
+            role: "assistant",
+            content:
+              "I'm having trouble connecting to MindCare AI. Please make sure the Flask backend is running.",
+            type: "error"
+          }
+        ]);
+
+      } finally {
+
+        setLoading(false);
+
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 0);
+      }
+    };
+
 
   /* =========================
      ENTER KEY
   ========================= */
-  const handleKeyDown = (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      sendMessage();
-    }
-  };
+
+  const handleKeyDown =
+    (event) => {
+
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey
+      ) {
+
+        event.preventDefault();
+
+        sendMessage();
+      }
+    };
+
 
   /* =========================
      CLEAR CHAT
   ========================= */
+
   const clearChat = () => {
-    setMessages([welcomeMessage]);
+
+    // Stop speech if currently playing
+    if (
+      "speechSynthesis" in window
+    ) {
+      window.speechSynthesis.cancel();
+    }
+
+
+    // Stop voice recognition
+    if (
+      recognitionRef.current
+    ) {
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.log(
+          "Recognition already stopped."
+        );
+      }
+    }
+
+
+    setMessages([
+      welcomeMessage
+    ]);
+
     setInput("");
-    inputRef.current?.focus();
+
+    setListening(false);
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
   };
+
 
   /* =========================
      TEXT TO SPEECH
   ========================= */
-  const speakMessage = (text) => {
-    if (!("speechSynthesis" in window)) {
-      alert(
-        "Text-to-speech is not supported in this browser."
+
+  const speakMessage =
+    (text) => {
+
+      if (
+        !("speechSynthesis" in window)
+      ) {
+
+        alert(
+          "Text-to-speech is not supported in this browser."
+        );
+
+        return;
+      }
+
+
+      // Stop previous speech
+      window.speechSynthesis.cancel();
+
+
+      const speech =
+        new SpeechSynthesisUtterance(
+          text
+        );
+
+
+      speech.rate =
+        0.95;
+
+      speech.pitch =
+        1;
+
+
+      window.speechSynthesis.speak(
+        speech
       );
-      return;
-    }
+    };
 
-    window.speechSynthesis.cancel();
-
-    const speech = new SpeechSynthesisUtterance(text);
-
-    speech.rate = 0.95;
-    speech.pitch = 1;
-
-    window.speechSynthesis.speak(speech);
-  };
 
   /* =========================
      VOICE INPUT
   ========================= */
-  const startVoiceInput = () => {
-    const SpeechRecognition =
-      window.SpeechRecognition ||
-      window.webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
-      alert(
-        "Voice input is not supported. Try Google Chrome or Microsoft Edge."
-      );
-      return;
-    }
+  const startVoiceInput =
+    () => {
 
-    if (listening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      return;
-    }
+      const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
 
-    const recognition = new SpeechRecognition();
 
-    recognition.lang = "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+      if (!SpeechRecognition) {
 
-    recognition.onstart = () => {
-      setListening(true);
+        alert(
+          "Voice input is not supported. Try Google Chrome or Microsoft Edge."
+        );
+
+        return;
+      }
+
+
+      // -----------------------------------------
+      // STOP CURRENT LISTENING
+      // -----------------------------------------
+
+      if (
+        listening &&
+        recognitionRef.current
+      ) {
+
+        recognitionRef.current.stop();
+
+        return;
+      }
+
+
+      const recognition =
+        new SpeechRecognition();
+
+
+      recognition.lang =
+        "en-US";
+
+      recognition.continuous =
+        false;
+
+      recognition.interimResults =
+        false;
+
+
+      // -----------------------------------------
+      // START
+      // -----------------------------------------
+
+      recognition.onstart =
+        () => {
+
+          setListening(true);
+        };
+
+
+      // -----------------------------------------
+      // RESULT
+      // -----------------------------------------
+
+      recognition.onresult =
+        (event) => {
+
+          const transcript =
+            event.results[0][0]
+              .transcript;
+
+
+          setInput((previous) =>
+            previous
+              ? `${previous} ${transcript}`
+              : transcript
+          );
+        };
+
+
+      // -----------------------------------------
+      // ERROR
+      // -----------------------------------------
+
+      recognition.onerror =
+        (event) => {
+
+          console.error(
+            "Voice error:",
+            event.error
+          );
+
+          setListening(false);
+        };
+
+
+      // -----------------------------------------
+      // END
+      // -----------------------------------------
+
+      recognition.onend =
+        () => {
+
+          setListening(false);
+
+          recognitionRef.current =
+            null;
+        };
+
+
+      recognitionRef.current =
+        recognition;
+
+
+      recognition.start();
     };
 
-    recognition.onresult = (event) => {
-      const transcript =
-        event.results[0][0].transcript;
 
-      setInput((previous) =>
-        previous
-          ? `${previous} ${transcript}`
-          : transcript
-      );
+  /* =========================
+     CLEANUP
+  ========================= */
+
+  useEffect(() => {
+
+    return () => {
+
+      // Stop speech
+      if (
+        "speechSynthesis" in window
+      ) {
+
+        window.speechSynthesis.cancel();
+      }
+
+
+      // Stop recognition
+      if (
+        recognitionRef.current
+      ) {
+
+        try {
+
+          recognitionRef.current.stop();
+
+        } catch (error) {
+
+          console.log(
+            "Recognition cleanup completed."
+          );
+        }
+      }
     };
 
-    recognition.onerror = (event) => {
-      console.error("Voice error:", event.error);
-      setListening(false);
-    };
+  }, []);
 
-    recognition.onend = () => {
-      setListening(false);
-    };
-
-    recognitionRef.current = recognition;
-
-    recognition.start();
-  };
 
   /* =========================
      QUICK PROMPTS
   ========================= */
+
   const quickPrompts = [
     "I feel sad today",
     "I'm feeling stressed",
@@ -197,12 +467,19 @@ function Chatbot() {
     "I need some motivation"
   ];
 
+
+  /* =========================
+     UI
+  ========================= */
+
   return (
     <div className="chat-page">
+
 
       {/* =========================
           HEADER
       ========================= */}
+
       <header className="chat-header">
 
         <div className="chat-title">
@@ -212,17 +489,26 @@ function Chatbot() {
           </div>
 
           <div>
-            <h2>MindCare AI</h2>
-            <p>Wellness Companion</p>
+
+            <h2>
+              MindCare AI
+            </h2>
+
+            <p>
+              Wellness Companion
+            </p>
+
           </div>
 
         </div>
+
 
         <div className="chat-header-actions">
 
           <button
             className="clear-button"
             onClick={clearChat}
+            disabled={loading}
           >
             🧹 Clear Chat
           </button>
@@ -231,9 +517,11 @@ function Chatbot() {
 
       </header>
 
+
       {/* =========================
           WELCOME
       ========================= */}
+
       <section className="welcome">
 
         <div className="welcome-icon">
@@ -252,83 +540,110 @@ function Chatbot() {
 
       </section>
 
+
       {/* =========================
           QUICK PROMPTS
       ========================= */}
+
       <div className="quick-prompts">
 
-        {quickPrompts.map((prompt) => (
-          <button
-            key={prompt}
-            onClick={() => sendMessage(prompt)}
-            disabled={loading}
-          >
-            {prompt}
-          </button>
-        ))}
+        {quickPrompts.map(
+          (prompt) => (
+
+            <button
+              key={prompt}
+              onClick={() =>
+                sendMessage(prompt)
+              }
+              disabled={loading}
+            >
+              {prompt}
+            </button>
+
+          )
+        )}
 
       </div>
+
 
       {/* =========================
           CHAT AREA
       ========================= */}
+
       <section className="chat-container">
 
         <div className="messages">
 
-          {messages.map((message, index) => (
+          {messages.map(
+            (message, index) => (
 
-            <div
-              key={index}
-              className={
-                message.role === "user"
-                  ? "message user"
-                  : "message assistant"
-              }
-            >
+              <div
+                key={index}
+                className={
+                  message.role === "user"
+                    ? "message user"
+                    : "message assistant"
+                }
+              >
 
-              {message.role === "assistant" && (
-                <div className="bot-avatar">
-                  🧠
-                </div>
-              )}
+                {message.role ===
+                  "assistant" && (
 
-              <div className="message-content">
-
-                <div
-                  className={
-                    message.type === "error"
-                      ? "bubble error-bubble"
-                      : "bubble"
-                  }
-                >
-                  {message.content}
-                </div>
-
-                {/* LISTEN BUTTON */}
-                {message.role === "assistant" &&
-                  message.type !== "error" && (
-
-                  <button
-                    className="speak-button"
-                    onClick={() =>
-                      speakMessage(message.content)
-                    }
-                  >
-                    🔊 Listen
-                  </button>
+                  <div className="bot-avatar">
+                    🧠
+                  </div>
 
                 )}
 
+
+                <div className="message-content">
+
+                  <div
+                    className={
+                      message.type ===
+                      "error"
+                        ? "bubble error-bubble"
+                        : "bubble"
+                    }
+                  >
+
+                    {message.content}
+
+                  </div>
+
+
+                  {/* LISTEN BUTTON */}
+
+                  {message.role ===
+                    "assistant" &&
+                    message.type !==
+                      "error" && (
+
+                    <button
+                      className="speak-button"
+                      onClick={() =>
+                        speakMessage(
+                          message.content
+                        )
+                      }
+                    >
+                      🔊 Listen
+                    </button>
+
+                  )}
+
+                </div>
+
               </div>
 
-            </div>
+            )
+          )}
 
-          ))}
 
           {/* =========================
               TYPING
           ========================= */}
+
           {loading && (
 
             <div className="message assistant">
@@ -338,45 +653,63 @@ function Chatbot() {
               </div>
 
               <div className="bubble typing">
+
                 <span></span>
                 <span></span>
                 <span></span>
+
               </div>
 
             </div>
 
           )}
 
-          <div ref={chatEndRef}></div>
+
+          <div
+            ref={chatEndRef}
+          />
 
         </div>
+
 
         {/* =========================
             INPUT
         ========================= */}
+
         <div className="input-container">
 
+
           {/* VOICE */}
+
           <button
             className={
               listening
                 ? "voice-button listening"
                 : "voice-button"
             }
-            onClick={startVoiceInput}
+            onClick={
+              startVoiceInput
+            }
+            disabled={loading}
             title="Voice input"
           >
             🎤
           </button>
 
+
           {/* TEXT */}
+
           <textarea
             ref={inputRef}
             value={input}
             onChange={(event) =>
-              setInput(event.target.value)
+              setInput(
+                event.target.value
+              )
             }
-            onKeyDown={handleKeyDown}
+            onKeyDown={
+              handleKeyDown
+            }
             placeholder={
               listening
                 ? "Listening..."
@@ -386,12 +719,17 @@ function Chatbot() {
             disabled={loading}
           />
 
+
           {/* SEND */}
+
           <button
             className="send-button"
-            onClick={() => sendMessage()}
+            onClick={() =>
+              sendMessage()
+            }
             disabled={
-              loading || !input.trim()
+              loading ||
+              !input.trim()
             }
           >
             ➤
@@ -399,15 +737,18 @@ function Chatbot() {
 
         </div>
 
+
         <p className="input-hint">
           Enter to send • Shift + Enter for a new line
         </p>
 
       </section>
 
+
       {/* =========================
           FOOTER
       ========================= */}
+
       <footer>
 
         <p>

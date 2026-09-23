@@ -1,9 +1,13 @@
+import React, {
+  useEffect,
+  useState
+} from "react";
 
-import React, { useEffect, useState } from "react";
 import "./App.css";
 import { auth } from "./firebase";
 
-const API_URL = "http://127.0.0.1:5000";
+const API_URL =
+  "http://127.0.0.1:5000";
 
 const defaultProfile = {
   name: "User",
@@ -12,26 +16,62 @@ const defaultProfile = {
 };
 
 function Settings() {
+
   // =========================================
   // PROFILE
   // =========================================
 
-  const [profile, setProfile] = useState(defaultProfile);
+  const [profile, setProfile] =
+    useState(defaultProfile);
 
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] =
+    useState(false);
 
-  const [tempName, setTempName] = useState("");
+  const [tempName, setTempName] =
+    useState("");
 
-  const [tempPhoto, setTempPhoto] = useState("");
+  const [tempPhoto, setTempPhoto] =
+    useState("");
 
   const [profileMessage, setProfileMessage] =
     useState("");
 
   const [loadingProfile, setLoadingProfile] =
-    useState(true);
+    useState(false);
 
   const [savingProfile, setSavingProfile] =
     useState(false);
+
+
+  // =========================================
+  // GET PROFILE INITIAL
+  // =========================================
+
+  const getProfileInitial = () => {
+
+    const email =
+      profile.email ||
+      auth.currentUser?.email ||
+      "";
+
+    const cleanEmail =
+      email.trim();
+
+    if (!cleanEmail) {
+      return "U";
+    }
+
+    const emailName =
+      cleanEmail.split("@")[0];
+
+    if (!emailName) {
+      return "U";
+    }
+
+    return emailName
+      .charAt(0)
+      .toUpperCase();
+  };
 
 
   // =========================================
@@ -39,25 +79,108 @@ function Settings() {
   // =========================================
 
   const loadProfile = async () => {
-    try {
-      const user = auth.currentUser;
 
-      if (!user) {
-        setLoadingProfile(false);
-        return;
-      }
+    const user =
+      auth.currentUser;
 
-      const response = await fetch(
-        `${API_URL}/users/${user.uid}`
+    if (!user) {
+      setLoadingProfile(false);
+      return;
+    }
+
+    // -----------------------------------------
+    // SHOW LOCAL PROFILE FIRST
+    // -----------------------------------------
+
+    const savedProfile =
+      localStorage.getItem(
+        "mindcareProfile"
       );
 
-      const data = await response.json();
+    if (savedProfile) {
+
+      try {
+
+        const localProfile =
+          JSON.parse(savedProfile);
+
+        const cachedProfile = {
+          name:
+            localProfile.name ||
+            user.displayName ||
+            "User",
+
+          email:
+            localProfile.email ||
+            user.email ||
+            "user@example.com",
+
+          photo:
+            localProfile.photo || ""
+        };
+
+        setProfile(
+          cachedProfile
+        );
+
+        setTempName(
+          cachedProfile.name
+        );
+
+        setTempPhoto(
+          cachedProfile.photo
+        );
+
+      } catch (error) {
+
+        console.error(
+          "LOCAL PROFILE ERROR:",
+          error
+        );
+      }
+    }
+
+    // -----------------------------------------
+    // LOAD DATABASE IN BACKGROUND
+    // -----------------------------------------
+
+    try {
+
+      const response =
+        await fetch(
+          `${API_URL}/users/${user.uid}`
+        );
+
+      const data =
+        await response.json();
+
+      console.log(
+        "PROFILE DATABASE RESPONSE:",
+        data
+      );
 
       if (
         response.ok &&
         data.success &&
         data.user
       ) {
+
+        /*
+         Only use a photo stored by MindCare.
+
+         Google/Firebase photoURL is NOT used.
+        */
+
+        const databasePhoto =
+          data.user.photo_url || "";
+
+        const uploadedPhoto =
+          databasePhoto.startsWith(
+            "data:image/"
+          )
+            ? databasePhoto
+            : "";
+
         const updatedProfile = {
           name:
             data.user.name ||
@@ -70,51 +193,44 @@ function Settings() {
             "user@example.com",
 
           photo:
-            data.user.photo_url ||
-            user.photoURL ||
-            ""
+            uploadedPhoto
         };
 
-        setProfile(updatedProfile);
-        setTempName(updatedProfile.name);
-        setTempPhoto(updatedProfile.photo);
+        setProfile(
+          updatedProfile
+        );
 
-        // UI fallback only
+        setTempName(
+          updatedProfile.name
+        );
+
+        setTempPhoto(
+          updatedProfile.photo
+        );
+
         localStorage.setItem(
           "mindcareProfile",
-          JSON.stringify(updatedProfile)
+          JSON.stringify(
+            updatedProfile
+          )
         );
-      } else {
-        // Firebase fallback
-        const firebaseProfile = {
-          name:
-            user.displayName ||
-            "User",
-
-          email:
-            user.email ||
-            "user@example.com",
-
-          photo:
-            user.photoURL ||
-            ""
-        };
-
-        setProfile(firebaseProfile);
-        setTempName(firebaseProfile.name);
-        setTempPhoto(firebaseProfile.photo);
       }
+
     } catch (error) {
+
       console.error(
         "PROFILE LOAD ERROR:",
         error
       );
 
-      // Firebase fallback
-      const user = auth.currentUser;
+      /*
+       Do not block Settings if
+       PostgreSQL is slow.
+      */
 
-      if (user) {
-        const firebaseProfile = {
+      if (!savedProfile) {
+
+        const fallbackProfile = {
           name:
             user.displayName ||
             "User",
@@ -123,16 +239,24 @@ function Settings() {
             user.email ||
             "user@example.com",
 
-          photo:
-            user.photoURL ||
-            ""
+          photo: ""
         };
 
-        setProfile(firebaseProfile);
-        setTempName(firebaseProfile.name);
-        setTempPhoto(firebaseProfile.photo);
+        setProfile(
+          fallbackProfile
+        );
+
+        setTempName(
+          fallbackProfile.name
+        );
+
+        setTempPhoto(
+          fallbackProfile.photo
+        );
       }
+
     } finally {
+
       setLoadingProfile(false);
     }
   };
@@ -143,39 +267,55 @@ function Settings() {
   // =========================================
 
   useEffect(() => {
+
     loadProfile();
 
-    const handleProfileUpdate = (event) => {
-      if (event.detail) {
-        const updatedProfile = {
-          name:
-            event.detail.name ||
-            "User",
+    const handleProfileUpdate =
+      (event) => {
 
-          email:
-            event.detail.email ||
-            "user@example.com",
+        if (event.detail) {
 
-          photo:
-            event.detail.photo ||
-            ""
-        };
+          const updatedProfile = {
+            name:
+              event.detail.name ||
+              "User",
 
-        setProfile(updatedProfile);
+            email:
+              event.detail.email ||
+              "user@example.com",
 
-        if (!editing) {
-          setTempName(
-            updatedProfile.name
+            photo:
+              event.detail.photo ||
+              ""
+          };
+
+          setProfile(
+            updatedProfile
           );
 
-          setTempPhoto(
-            updatedProfile.photo
+          if (!editing) {
+
+            setTempName(
+              updatedProfile.name
+            );
+
+            setTempPhoto(
+              updatedProfile.photo
+            );
+          }
+
+          localStorage.setItem(
+            "mindcareProfile",
+            JSON.stringify(
+              updatedProfile
+            )
           );
+
+        } else {
+
+          loadProfile();
         }
-      } else {
-        loadProfile();
-      }
-    };
+      };
 
     window.addEventListener(
       "mindcareProfileUpdated",
@@ -183,11 +323,13 @@ function Settings() {
     );
 
     return () => {
+
       window.removeEventListener(
         "mindcareProfileUpdated",
         handleProfileUpdate
       );
     };
+
   }, [editing]);
 
 
@@ -195,53 +337,67 @@ function Settings() {
   // PROFILE PHOTO
   // =========================================
 
-  const handlePhotoChange = (event) => {
-    const file =
-      event.target.files?.[0];
+  const handlePhotoChange =
+    (event) => {
 
-    if (!file) return;
+      const file =
+        event.target.files?.[0];
 
-    if (!file.type.startsWith("image/")) {
-      setProfileMessage(
-        "Please select an image file."
-      );
+      if (!file) return;
+
+      if (
+        !file.type.startsWith(
+          "image/"
+        )
+      ) {
+
+        setProfileMessage(
+          "Please select an image file."
+        );
+
+        event.target.value = "";
+
+        return;
+      }
+
+      // Maximum 2 MB
+      if (
+        file.size >
+        2 * 1024 * 1024
+      ) {
+
+        setProfileMessage(
+          "Please select an image smaller than 2 MB."
+        );
+
+        event.target.value = "";
+
+        return;
+      }
+
+      const reader =
+        new FileReader();
+
+      reader.onload = () => {
+
+        setTempPhoto(
+          reader.result
+        );
+
+        setProfileMessage("");
+      };
+
+      reader.onerror = () => {
+
+        setProfileMessage(
+          "Unable to load the selected image."
+        );
+      };
+
+      reader.readAsDataURL(file);
 
       event.target.value = "";
-      return;
-    }
-
-    // Maximum 2 MB
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileMessage(
-        "Please select an image smaller than 2 MB."
-      );
-
-      event.target.value = "";
-      return;
-    }
-
-    const reader =
-      new FileReader();
-
-    reader.onload = () => {
-      setTempPhoto(
-        reader.result
-      );
-
-      setProfileMessage("");
     };
-
-    reader.onerror = () => {
-      setProfileMessage(
-        "Unable to load the selected image."
-      );
-    };
-
-    reader.readAsDataURL(file);
-
-    // Allow same image to be selected again
-    event.target.value = "";
-  };
 
 
   // =========================================
@@ -249,23 +405,28 @@ function Settings() {
   // =========================================
 
   const removeProfilePhoto = () => {
+
     setTempPhoto("");
+
     setProfileMessage("");
   };
 
 
   // =========================================
-  // SAVE PROFILE TO POSTGRESQL
+  // SAVE PROFILE
   // =========================================
 
   const saveProfile = async () => {
+
     const trimmedName =
       tempName.trim();
 
     if (!trimmedName) {
+
       setProfileMessage(
         "Please enter your name."
       );
+
       return;
     }
 
@@ -273,128 +434,174 @@ function Settings() {
       auth.currentUser;
 
     if (!user) {
+
       setProfileMessage(
         "Please log in again."
       );
+
       return;
     }
 
+    // =========================================
+    // CREATE UPDATED PROFILE
+    // =========================================
+
+    const updatedProfile = {
+
+      name:
+        trimmedName,
+
+      email:
+        user.email ||
+        profile.email ||
+        "user@example.com",
+
+      photo:
+        tempPhoto || ""
+    };
+
+
+    // =========================================
+    // UPDATE UI IMMEDIATELY
+    // =========================================
+
+    setProfile(
+      updatedProfile
+    );
+
+    setTempName(
+      updatedProfile.name
+    );
+
+    setTempPhoto(
+      updatedProfile.photo
+    );
+
+
+    // =========================================
+    // UPDATE LOCAL STORAGE IMMEDIATELY
+    // =========================================
+
+    localStorage.setItem(
+      "mindcareProfile",
+      JSON.stringify(
+        updatedProfile
+      )
+    );
+
+
+    // =========================================
+    // UPDATE SIDEBAR IMMEDIATELY
+    // =========================================
+
+    window.dispatchEvent(
+      new CustomEvent(
+        "mindcareProfileUpdated",
+        {
+          detail:
+            updatedProfile
+        }
+      )
+    );
+
+
+    // =========================================
+    // CLOSE EDIT MODE IMMEDIATELY
+    // =========================================
+
+    setEditing(false);
+
+
+    // =========================================
+    // SHOW SUCCESS IMMEDIATELY
+    // =========================================
+
+    setProfileMessage(
+      "Profile saved successfully."
+    );
+
+
+    // =========================================
+    // SAVE TO POSTGRESQL IN BACKGROUND
+    // =========================================
+
     setSavingProfile(true);
-    setProfileMessage("");
 
     try {
-      const updatedProfile = {
-        name: trimmedName,
 
-        email:
-          user.email ||
-          profile.email ||
-          "user@example.com",
-
-        photo:
-          tempPhoto ||
-          ""
-      };
-
-      // =====================================
-      // SAVE TO POSTGRESQL
-      // =====================================
-
-      const response = await fetch(
-        `${API_URL}/users`,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body: JSON.stringify({
-            firebase_uid:
-              user.uid,
-
-            name:
-              updatedProfile.name,
-
-            email:
-              updatedProfile.email,
-
-            photo_url:
-              updatedProfile.photo
-          })
-        }
+      console.log(
+        "Saving profile to PostgreSQL in background..."
       );
+
+      const response =
+        await fetch(
+          `${API_URL}/users`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body: JSON.stringify({
+
+              firebase_uid:
+                user.uid,
+
+              name:
+                updatedProfile.name,
+
+              email:
+                updatedProfile.email,
+
+              photo_url:
+                updatedProfile.photo
+            })
+          }
+        );
 
       const data =
         await response.json();
+
+      console.log(
+        "PROFILE SAVE RESPONSE:",
+        data
+      );
 
       if (
         !response.ok ||
         !data.success
       ) {
+
         throw new Error(
           data.error ||
           "Unable to save profile."
         );
       }
 
-      // =====================================
-      // UPDATE STATE
-      // =====================================
-
-      setProfile(
-        updatedProfile
-      );
-
-      setTempName(
-        updatedProfile.name
-      );
-
-      setTempPhoto(
-        updatedProfile.photo
-      );
-
-      // =====================================
-      // LOCAL UI FALLBACK
-      // =====================================
-
-      localStorage.setItem(
-        "mindcareProfile",
-        JSON.stringify(updatedProfile)
-      );
-
-      // =====================================
-      // UPDATE SIDEBAR
-      // =====================================
-
-      window.dispatchEvent(
-        new CustomEvent(
-          "mindcareProfileUpdated",
-          {
-            detail:
-              updatedProfile
-          }
-        )
-      );
-
-      setEditing(false);
-
-      setProfileMessage(
-        "Profile saved successfully."
+      console.log(
+        "Profile saved to PostgreSQL successfully."
       );
 
     } catch (error) {
+
       console.error(
-        "PROFILE SAVE ERROR:",
+        "PROFILE BACKGROUND SAVE ERROR:",
         error
       );
 
+      /*
+       UI has already been updated.
+       Only the database save failed.
+      */
+
       setProfileMessage(
-        error.message ||
-        "Unable to save profile."
+        "Profile updated, but database save failed."
       );
+
     } finally {
+
       setSavingProfile(false);
     }
   };
@@ -405,6 +612,7 @@ function Settings() {
   // =========================================
 
   const cancelEditing = () => {
+
     setTempName(
       profile.name
     );
@@ -446,13 +654,16 @@ function Settings() {
 
   const changeNotifications =
     async () => {
+
       const newValue =
         !notifications;
 
       if (newValue) {
+
         if (
           !("Notification" in window)
         ) {
+
           setNotifications(false);
 
           localStorage.setItem(
@@ -473,6 +684,7 @@ function Settings() {
         if (
           permission !== "granted"
         ) {
+
           setNotifications(false);
 
           localStorage.setItem(
@@ -500,7 +712,9 @@ function Settings() {
               "/favicon.ico"
           }
         );
+
       } else {
+
         setNotifications(false);
 
         localStorage.setItem(
@@ -516,6 +730,7 @@ function Settings() {
   // =========================================
 
   useEffect(() => {
+
     if (!notifications) {
       return;
     }
@@ -527,48 +742,57 @@ function Settings() {
       return;
     }
 
-    const checkDailyReminder = () => {
-      const now =
-        new Date();
+    const checkDailyReminder =
+      () => {
 
-      const today =
-        `${now.getFullYear()}-${String(
-          now.getMonth() + 1
-        ).padStart(2, "0")}-${String(
-          now.getDate()
-        ).padStart(2, "0")}`;
+        const now =
+          new Date();
 
-      const lastReminder =
-        localStorage.getItem(
-          "mindcareLastReminder"
-        );
+        const today =
+          `${now.getFullYear()}-${String(
+            now.getMonth() + 1
+          ).padStart(
+            2,
+            "0"
+          )}-${String(
+            now.getDate()
+          ).padStart(
+            2,
+            "0"
+          )}`;
 
-      if (
-        lastReminder === today
-      ) {
-        return;
-      }
+        const lastReminder =
+          localStorage.getItem(
+            "mindcareLastReminder"
+          );
 
-      if (
-        now.getHours() >= 18
-      ) {
-        new Notification(
-          "🧠 MindCare AI",
-          {
-            body:
-              "How are you feeling today? Take a moment for your daily mood check-in. 💙",
+        if (
+          lastReminder === today
+        ) {
+          return;
+        }
 
-            icon:
-              "/favicon.ico"
-          }
-        );
+        if (
+          now.getHours() >= 18
+        ) {
 
-        localStorage.setItem(
-          "mindcareLastReminder",
-          today
-        );
-      }
-    };
+          new Notification(
+            "🧠 MindCare AI",
+            {
+              body:
+                "How are you feeling today? Take a moment for your daily mood check-in. 💙",
+
+              icon:
+                "/favicon.ico"
+            }
+          );
+
+          localStorage.setItem(
+            "mindcareLastReminder",
+            today
+          );
+        }
+      };
 
     checkDailyReminder();
 
@@ -579,10 +803,12 @@ function Settings() {
       );
 
     return () => {
+
       clearInterval(
         reminderInterval
       );
     };
+
   }, [notifications]);
 
 
@@ -601,6 +827,7 @@ function Settings() {
   // =========================================
 
   const openEdit = () => {
+
     setTempName(
       profile.name
     );
@@ -629,6 +856,7 @@ function Settings() {
       <div className="settings-top">
 
         <div>
+
           <h1>
             Settings
           </h1>
@@ -636,6 +864,7 @@ function Settings() {
           <p>
             Manage your MindCare AI preferences.
           </p>
+
         </div>
 
         <span className="settings-search">
@@ -662,14 +891,18 @@ function Settings() {
             <div className="profile-photo">
 
               {profile.photo ? (
+
                 <img
                   src={profile.photo}
                   alt="Profile"
                 />
+
               ) : (
-                <span>
-                  👤
+
+                <span className="profile-initial">
+                  {getProfileInitial()}
                 </span>
+
               )}
 
             </div>
@@ -722,14 +955,18 @@ function Settings() {
             <div className="profile-edit-photo">
 
               {tempPhoto ? (
+
                 <img
                   src={tempPhoto}
                   alt="Profile preview"
                 />
+
               ) : (
-                <span>
-                  👤
+
+                <span className="profile-initial">
+                  {getProfileInitial()}
                 </span>
+
               )}
 
             </div>
@@ -826,9 +1063,7 @@ function Settings() {
                 onClick={
                   saveProfile
                 }
-                disabled={
-                  savingProfile
-                }
+                disabled={savingProfile}
               >
 
                 {savingProfile
@@ -843,9 +1078,7 @@ function Settings() {
                 onClick={
                   cancelEditing
                 }
-                disabled={
-                  savingProfile
-                }
+                disabled={savingProfile}
               >
                 Cancel
               </button>
@@ -1282,4 +1515,3 @@ function Settings() {
 }
 
 export default Settings;
-

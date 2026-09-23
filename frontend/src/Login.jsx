@@ -1,5 +1,5 @@
-
 import React, { useState } from "react";
+
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -15,307 +15,613 @@ import {
 
 import "./Login.css";
 
-const API_URL = "http://127.0.0.1:5000";
+const API_URL =
+  "http://127.0.0.1:5000";
+
 
 function Login({ onLogin }) {
-  const [mode, setMode] = useState("login");
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [mode, setMode] =
+    useState("login");
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [name, setName] =
+    useState("");
 
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [email, setEmail] =
+    useState("");
 
-  // Save Firebase user to PostgreSQL
-  const saveUserToDatabase = async (user, customName = "") => {
-    if (!user) return;
+  const [password, setPassword] =
+    useState("");
 
-    const profile = {
-      name:
-        customName ||
-        user.displayName ||
-        "User",
+  const [confirmPassword, setConfirmPassword] =
+    useState("");
 
-      email:
-        user.email ||
-        "user@example.com",
+  const [showPassword, setShowPassword] =
+    useState(false);
 
-      photo:
-        user.photoURL ||
-        ""
-    };
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
 
-    try {
-      const response = await fetch(`${API_URL}/users`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          firebase_uid: user.uid,
-          name: profile.name,
-          email: profile.email,
-          photo_url: profile.photo
-        })
-      });
+  const [loading, setLoading] =
+    useState(false);
 
-      const data = await response.json();
+  const [message, setMessage] =
+    useState("");
 
-      if (!response.ok || !data.success) {
-        console.error(
-          "DATABASE USER SAVE ERROR:",
-          data.error
+
+  // =========================================
+  // SAVE USER TO POSTGRESQL
+  // BACKGROUND OPERATION
+  // =========================================
+
+  const saveUserToDatabase =
+    async (
+      user,
+      customName = ""
+    ) => {
+
+      if (!user) {
+        return;
+      }
+
+
+      const profile = {
+
+        name:
+          customName ||
+          user.displayName ||
+          "User",
+
+        email:
+          user.email ||
+          "user@example.com",
+
+        /*
+          Do not use Google photoURL as the
+          MindCare profile photo.
+
+          Profile.jsx / Settings.jsx can
+          show the email initial when there
+          is no uploaded photo.
+        */
+        photo: ""
+      };
+
+
+      // =====================================
+      // UPDATE FRONTEND IMMEDIATELY
+      // =====================================
+
+      localStorage.setItem(
+        "mindcareProfile",
+        JSON.stringify(profile)
+      );
+
+      window.dispatchEvent(
+        new CustomEvent(
+          "mindcareProfileUpdated",
+          {
+            detail: profile
+          }
+        )
+      );
+
+
+      // =====================================
+      // SAVE TO DATABASE IN BACKGROUND
+      // =====================================
+
+      try {
+
+        console.log(
+          "Saving user to PostgreSQL in background..."
         );
-      } else {
+
+
+        const response =
+          await fetch(
+            `${API_URL}/users`,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body: JSON.stringify({
+
+                firebase_uid:
+                  user.uid,
+
+                name:
+                  profile.name,
+
+                email:
+                  profile.email,
+
+                photo_url:
+                  profile.photo
+
+              })
+            }
+          );
+
+
+        const data =
+          await response.json();
+
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+
+          console.error(
+            "DATABASE USER SAVE ERROR:",
+            data.error
+          );
+
+          return;
+        }
+
+
         console.log(
           "User saved to PostgreSQL successfully."
         );
+
+      } catch (error) {
+
+        /*
+          Do not block login if PostgreSQL
+          is slow or temporarily unavailable.
+        */
+
+        console.error(
+          "BACKGROUND DATABASE SAVE ERROR:",
+          error
+        );
       }
-    } catch (error) {
-      console.error(
-        "DATABASE CONNECTION ERROR:",
-        error
-      );
-    }
+    };
 
-    // LocalStorage is only used for frontend UI fallback
-    localStorage.setItem(
-      "mindcareProfile",
-      JSON.stringify(profile)
-    );
 
-    window.dispatchEvent(
-      new CustomEvent("mindcareProfileUpdated", {
-        detail: profile
-      })
-    );
-  };
+  // =========================================
+  // EMAIL LOGIN / SIGNUP
+  // =========================================
 
-  // Email Login / Signup
-  const handleEmailAuth = async (event) => {
-    event.preventDefault();
+  const handleEmailAuth =
+    async (event) => {
 
-    setMessage("");
-    setLoading(true);
+      event.preventDefault();
 
-    try {
-      if (mode === "signup") {
-        if (!name.trim()) {
-          setMessage("Please enter your name.");
-          setLoading(false);
-          return;
+      setMessage("");
+      setLoading(true);
+
+
+      try {
+
+        // =====================================
+        // SIGNUP
+        // =====================================
+
+        if (
+          mode === "signup"
+        ) {
+
+          if (
+            !name.trim()
+          ) {
+
+            setMessage(
+              "Please enter your name."
+            );
+
+            setLoading(false);
+
+            return;
+          }
+
+
+          if (
+            password.length < 6
+          ) {
+
+            setMessage(
+              "Password must contain at least 6 characters."
+            );
+
+            setLoading(false);
+
+            return;
+          }
+
+
+          if (
+            password !==
+            confirmPassword
+          ) {
+
+            setMessage(
+              "Passwords do not match."
+            );
+
+            setLoading(false);
+
+            return;
+          }
+
+
+          // -----------------------------------
+          // CREATE FIREBASE ACCOUNT
+          // -----------------------------------
+
+          const result =
+            await createUserWithEmailAndPassword(
+              auth,
+              email.trim(),
+              password
+            );
+
+
+          // -----------------------------------
+          // SAVE DISPLAY NAME IN FIREBASE
+          // -----------------------------------
+
+          await updateProfile(
+            result.user,
+            {
+              displayName:
+                name.trim()
+            }
+          );
+
+
+          // -----------------------------------
+          // ENTER APP IMMEDIATELY
+          // -----------------------------------
+
+          onLogin(
+            result.user
+          );
+
+
+          /*
+            PostgreSQL save happens after
+            login so it does not block UI.
+          */
+
+          saveUserToDatabase(
+            result.user,
+            name.trim()
+          );
+
         }
 
-        if (password.length < 6) {
+        // =====================================
+        // LOGIN
+        // =====================================
+
+        else {
+
+          // -----------------------------------
+          // FIREBASE LOGIN
+          // -----------------------------------
+
+          const result =
+            await signInWithEmailAndPassword(
+              auth,
+              email.trim(),
+              password
+            );
+
+
+          // -----------------------------------
+          // ENTER APP IMMEDIATELY
+          // -----------------------------------
+
+          onLogin(
+            result.user
+          );
+
+
+          /*
+            PostgreSQL update runs in
+            background.
+          */
+
+          saveUserToDatabase(
+            result.user
+          );
+        }
+
+      } catch (error) {
+
+        console.error(
+          "LOGIN ERROR:",
+          error
+        );
+
+
+        if (
+          error.code ===
+          "auth/email-already-in-use"
+        ) {
+
           setMessage(
-            "Password must contain at least 6 characters."
+            "This email is already registered."
           );
-          setLoading(false);
-          return;
+
         }
 
-        if (password !== confirmPassword) {
-          setMessage("Passwords do not match.");
-          setLoading(false);
-          return;
+        else if (
+          error.code ===
+          "auth/invalid-email"
+        ) {
+
+          setMessage(
+            "Please enter a valid email address."
+          );
+
         }
 
-        const result =
-          await createUserWithEmailAndPassword(
-            auth,
-            email,
-            password
+        else if (
+          error.code ===
+            "auth/invalid-credential" ||
+          error.code ===
+            "auth/wrong-password"
+        ) {
+
+          setMessage(
+            "Incorrect email or password."
           );
 
-        await updateProfile(result.user, {
-          displayName: name.trim()
-        });
+        }
 
-        // Save user in PostgreSQL
-        await saveUserToDatabase(
-          result.user,
-          name.trim()
-        );
+        else if (
+          error.code ===
+          "auth/user-not-found"
+        ) {
 
-        onLogin(result.user);
-      } else {
-        const result =
-          await signInWithEmailAndPassword(
-            auth,
-            email,
-            password
+          setMessage(
+            "No account found with this email."
           );
 
-        // Save/update user in PostgreSQL
-        await saveUserToDatabase(result.user);
+        }
 
-        onLogin(result.user);
+        else if (
+          error.code ===
+          "auth/weak-password"
+        ) {
+
+          setMessage(
+            "Password is too weak."
+          );
+
+        }
+
+        else {
+
+          setMessage(
+            "Something went wrong. Please try again."
+          );
+        }
+
+      } finally {
+
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("LOGIN ERROR:", error);
+    };
+
+
+  // =========================================
+  // GOOGLE LOGIN
+  // =========================================
+
+  const handleGoogleLogin =
+    async () => {
+
+      setMessage("");
+      setLoading(true);
+
+
+      try {
+
+        // -----------------------------------
+        // GOOGLE AUTHENTICATION
+        // -----------------------------------
+
+        const result =
+          await signInWithPopup(
+            auth,
+            googleProvider
+          );
+
+
+        // -----------------------------------
+        // ENTER APP IMMEDIATELY
+        // -----------------------------------
+
+        onLogin(
+          result.user
+        );
+
+
+        // -----------------------------------
+        // DATABASE IN BACKGROUND
+        // -----------------------------------
+
+        saveUserToDatabase(
+          result.user
+        );
+
+      } catch (error) {
+
+        console.error(
+          "GOOGLE LOGIN ERROR:",
+          error
+        );
+
+
+        if (
+          error.code ===
+          "auth/popup-closed-by-user"
+        ) {
+
+          setMessage(
+            "Google login was cancelled."
+          );
+
+        }
+
+        else if (
+          error.code ===
+          "auth/popup-blocked"
+        ) {
+
+          setMessage(
+            "Please allow popups for Google login."
+          );
+
+        }
+
+        else {
+
+          setMessage(
+            "Google login failed. Please try again."
+          );
+        }
+
+      } finally {
+
+        setLoading(false);
+      }
+    };
+
+
+  // =========================================
+  // FORGOT PASSWORD
+  // =========================================
+
+  const handleForgotPassword =
+    async (event) => {
+
+      event.preventDefault();
+
 
       if (
-        error.code ===
-        "auth/email-already-in-use"
+        !email.trim()
       ) {
+
         setMessage(
-          "This email is already registered."
+          "Enter your email address first."
         );
-      } else if (
-        error.code === "auth/invalid-email"
-      ) {
-        setMessage(
-          "Please enter a valid email address."
-        );
-      } else if (
-        error.code === "auth/invalid-credential" ||
-        error.code === "auth/wrong-password"
-      ) {
-        setMessage(
-          "Incorrect email or password."
-        );
-      } else if (
-        error.code === "auth/user-not-found"
-      ) {
-        setMessage(
-          "No account found with this email."
-        );
-      } else if (
-        error.code === "auth/weak-password"
-      ) {
-        setMessage(
-          "Password is too weak."
-        );
-      } else {
-        setMessage(
-          "Something went wrong. Please try again."
-        );
+
+        return;
       }
-    }
 
-    setLoading(false);
-  };
 
-  // Google Login
-  const handleGoogleLogin = async () => {
-    setMessage("");
-    setLoading(true);
+      setLoading(true);
+      setMessage("");
 
-    try {
-      const result = await signInWithPopup(
-        auth,
-        googleProvider
-      );
 
-      // Save Google user in PostgreSQL
-      await saveUserToDatabase(result.user);
+      try {
 
-      onLogin(result.user);
-    } catch (error) {
-      console.error(
-        "GOOGLE LOGIN ERROR:",
-        error
-      );
-
-      if (
-        error.code ===
-        "auth/popup-closed-by-user"
-      ) {
-        setMessage(
-          "Google login was cancelled."
+        await sendPasswordResetEmail(
+          auth,
+          email.trim()
         );
-      } else if (
-        error.code ===
-        "auth/popup-blocked"
-      ) {
+
+
         setMessage(
-          "Please allow popups for Google login."
+          "Password reset link has been sent to your email."
         );
-      } else {
-        setMessage(
-          "Google login failed. Please try again."
+
+      } catch (error) {
+
+        console.error(
+          "PASSWORD RESET ERROR:",
+          error
         );
+
+
+        if (
+          error.code ===
+          "auth/user-not-found"
+        ) {
+
+          setMessage(
+            "No account found with this email."
+          );
+
+        }
+
+        else if (
+          error.code ===
+          "auth/invalid-email"
+        ) {
+
+          setMessage(
+            "Please enter a valid email address."
+          );
+
+        }
+
+        else {
+
+          setMessage(
+            "Unable to send reset link."
+          );
+        }
+
+      } finally {
+
+        setLoading(false);
       }
-    }
+    };
 
-    setLoading(false);
-  };
 
-  // Forgot Password
-  const handleForgotPassword = async (event) => {
-    event.preventDefault();
+  // =========================================
+  // SWITCH LOGIN / SIGNUP
+  // =========================================
 
-    if (!email.trim()) {
-      setMessage(
-        "Enter your email address first."
+  const switchMode =
+    () => {
+
+      setMessage("");
+
+      setEmail("");
+
+      setPassword("");
+
+      setConfirmPassword("");
+
+      setName("");
+
+      setShowPassword(false);
+
+      setShowConfirmPassword(false);
+
+
+      setMode(
+        mode === "login"
+          ? "signup"
+          : "login"
       );
-      return;
-    }
+    };
 
-    setLoading(true);
-    setMessage("");
 
-    try {
-      await sendPasswordResetEmail(
-        auth,
-        email
-      );
-
-      setMessage(
-        "Password reset link has been sent to your email."
-      );
-    } catch (error) {
-      console.error(
-        "PASSWORD RESET ERROR:",
-        error
-      );
-
-      if (
-        error.code ===
-        "auth/user-not-found"
-      ) {
-        setMessage(
-          "No account found with this email."
-        );
-      } else if (
-        error.code ===
-        "auth/invalid-email"
-      ) {
-        setMessage(
-          "Please enter a valid email address."
-        );
-      } else {
-        setMessage(
-          "Unable to send reset link."
-        );
-      }
-    }
-
-    setLoading(false);
-  };
-
-  // Switch Login / Signup
-  const switchMode = () => {
-    setMessage("");
-    setEmail("");
-    setPassword("");
-    setConfirmPassword("");
-    setName("");
-
-    setMode(
-      mode === "login"
-        ? "signup"
-        : "login"
-    );
-  };
+  // =========================================
+  // UI
+  // =========================================
 
   return (
+
     <div className="login-page">
+
+
+      {/* =====================================
+          BRAND
+      ===================================== */}
 
       <div className="login-brand">
 
@@ -323,17 +629,32 @@ function Login({ onLogin }) {
           🧠
         </div>
 
-        <h1>MindCare AI</h1>
+        <h1>
+          MindCare AI
+        </h1>
 
-        <p>Wellness Companion</p>
+        <p>
+          Wellness Companion
+        </p>
 
       </div>
 
+
+      {/* =====================================
+          LOGIN CARD
+      ===================================== */}
+
       <div className="login-card">
 
-        {/* LOGIN */}
+
+        {/* ===================================
+            LOGIN
+        =================================== */}
+
         {mode === "login" && (
+
           <>
+
             <div className="login-header">
 
               <h2>
@@ -346,21 +667,33 @@ function Login({ onLogin }) {
 
             </div>
 
-            <form onSubmit={handleEmailAuth}>
 
-              <label>Email</label>
+            <form
+              onSubmit={
+                handleEmailAuth
+              }
+            >
+
+              <label>
+                Email
+              </label>
 
               <input
                 type="email"
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) =>
-                  setEmail(e.target.value)
+                  setEmail(
+                    e.target.value
+                  )
                 }
                 required
               />
 
-              <label>Password</label>
+
+              <label>
+                Password
+              </label>
 
               <div className="password-wrapper">
 
@@ -373,10 +706,13 @@ function Login({ onLogin }) {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) =>
-                    setPassword(e.target.value)
+                    setPassword(
+                      e.target.value
+                    )
                   }
                   required
                 />
+
 
                 <button
                   type="button"
@@ -387,75 +723,111 @@ function Login({ onLogin }) {
                   }
                   className="eye-button"
                 >
+
                   {showPassword
                     ? "🙈"
                     : "👁️"}
+
                 </button>
 
               </div>
+
 
               <button
                 type="button"
                 className="forgot-button"
                 onClick={() => {
+
                   setMessage("");
-                  setMode("forgot");
+
+                  setMode(
+                    "forgot"
+                  );
+
                 }}
               >
                 Forgot password?
               </button>
 
+
               {message && (
+
                 <div className="login-message">
                   {message}
                 </div>
+
               )}
+
 
               <button
                 type="submit"
                 className="primary-login-button"
-                disabled={loading}
+                disabled={
+                  loading
+                }
               >
+
                 {loading
-                  ? "Please wait..."
+                  ? "Signing in..."
                   : "Log In"}
+
               </button>
 
             </form>
 
+
             <div className="divider">
-              <span>or</span>
+              <span>
+                or
+              </span>
             </div>
+
 
             <button
               className="social-button"
-              onClick={handleGoogleLogin}
-              disabled={loading}
+              onClick={
+                handleGoogleLogin
+              }
+              disabled={
+                loading
+              }
             >
+
               <span className="google-icon">
                 G
               </span>
 
               Continue with Google
+
             </button>
+
 
             <p className="switch-text">
 
               Don't have an account?
 
               <button
-                onClick={switchMode}
+                onClick={
+                  switchMode
+                }
               >
                 Sign Up
               </button>
 
             </p>
+
           </>
         )}
 
-        {/* SIGNUP */}
+
+        {/* ===================================
+            SIGNUP
+        =================================== */}
+
         {mode === "signup" && (
+
           <>
+
             <div className="login-header">
 
               <h2>
@@ -468,33 +840,50 @@ function Login({ onLogin }) {
 
             </div>
 
-            <form onSubmit={handleEmailAuth}>
 
-              <label>Full Name</label>
+            <form
+              onSubmit={
+                handleEmailAuth
+              }
+            >
+
+              <label>
+                Full Name
+              </label>
 
               <input
                 type="text"
                 placeholder="Enter your name"
                 value={name}
                 onChange={(e) =>
-                  setName(e.target.value)
+                  setName(
+                    e.target.value
+                  )
                 }
                 required
               />
 
-              <label>Email</label>
+
+              <label>
+                Email
+              </label>
 
               <input
                 type="email"
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) =>
-                  setEmail(e.target.value)
+                  setEmail(
+                    e.target.value
+                  )
                 }
                 required
               />
 
-              <label>Password</label>
+
+              <label>
+                Password
+              </label>
 
               <div className="password-wrapper">
 
@@ -507,10 +896,13 @@ function Login({ onLogin }) {
                   placeholder="Minimum 6 characters"
                   value={password}
                   onChange={(e) =>
-                    setPassword(e.target.value)
+                    setPassword(
+                      e.target.value
+                    )
                   }
                   required
                 />
+
 
                 <button
                   type="button"
@@ -521,12 +913,15 @@ function Login({ onLogin }) {
                     )
                   }
                 >
+
                   {showPassword
                     ? "🙈"
                     : "👁️"}
+
                 </button>
 
               </div>
+
 
               <label>
                 Confirm Password
@@ -550,6 +945,7 @@ function Login({ onLogin }) {
                   required
                 />
 
+
                 <button
                   type="button"
                   className="eye-button"
@@ -559,64 +955,94 @@ function Login({ onLogin }) {
                     )
                   }
                 >
+
                   {showConfirmPassword
                     ? "🙈"
                     : "👁️"}
+
                 </button>
 
               </div>
 
+
               {message && (
+
                 <div className="login-message">
                   {message}
                 </div>
+
               )}
+
 
               <button
                 type="submit"
                 className="primary-login-button"
-                disabled={loading}
+                disabled={
+                  loading
+                }
               >
+
                 {loading
                   ? "Creating account..."
                   : "Create Account"}
+
               </button>
 
             </form>
 
+
             <div className="divider">
-              <span>or</span>
+              <span>
+                or
+              </span>
             </div>
+
 
             <button
               className="social-button"
-              onClick={handleGoogleLogin}
-              disabled={loading}
+              onClick={
+                handleGoogleLogin
+              }
+              disabled={
+                loading
+              }
             >
+
               <span className="google-icon">
                 G
               </span>
 
               Continue with Google
+
             </button>
+
 
             <p className="switch-text">
 
               Already have an account?
 
               <button
-                onClick={switchMode}
+                onClick={
+                  switchMode
+                }
               >
                 Log In
               </button>
 
             </p>
+
           </>
         )}
 
-        {/* FORGOT PASSWORD */}
+
+        {/* ===================================
+            FORGOT PASSWORD
+        =================================== */}
+
         {mode === "forgot" && (
+
           <>
+
             <div className="login-header">
 
               <div className="forgot-icon">
@@ -634,43 +1060,66 @@ function Login({ onLogin }) {
 
             </div>
 
-            <form onSubmit={handleForgotPassword}>
 
-              <label>Email</label>
+            <form
+              onSubmit={
+                handleForgotPassword
+              }
+            >
+
+              <label>
+                Email
+              </label>
 
               <input
                 type="email"
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) =>
-                  setEmail(e.target.value)
+                  setEmail(
+                    e.target.value
+                  )
                 }
                 required
               />
 
+
               {message && (
+
                 <div className="login-message">
                   {message}
                 </div>
+
               )}
+
 
               <button
                 type="submit"
                 className="primary-login-button"
-                disabled={loading}
+                disabled={
+                  loading
+                }
               >
+
                 {loading
                   ? "Sending..."
                   : "Send Reset Link"}
+
               </button>
 
             </form>
 
+
             <button
               className="back-login-button"
               onClick={() => {
+
                 setMessage("");
-                setMode("login");
+
+                setMode(
+                  "login"
+                );
+
               }}
             >
               ← Back to Login
@@ -680,6 +1129,11 @@ function Login({ onLogin }) {
         )}
 
       </div>
+
+
+      {/* =====================================
+          FOOTER
+      ===================================== */}
 
       <p className="login-footer">
         Your wellness space, whenever you need it 💙

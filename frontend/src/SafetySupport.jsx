@@ -1,130 +1,313 @@
-import React, { useEffect, useState } from "react";
-import "./SafetySupport.css";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import React, {
+  useEffect,
+  useState
+} from "react";
 
-const API_URL = "http://127.0.0.1:5000";
+import "./SafetySupport.css";
+
+import {
+  getAuth,
+  onAuthStateChanged
+} from "firebase/auth";
+
+const API_URL =
+  "http://127.0.0.1:5000";
 
 function SafetySupport({ onBackToChat }) {
-  const [trustedContact, setTrustedContact] = useState("");
-  const [loading, setLoading] = useState(true);
+
+  const [trustedContact, setTrustedContact] =
+    useState("");
+
+  const [contactInput, setContactInput] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [loadingContact, setLoadingContact] =
+    useState(true);
+
+  const [savingContact, setSavingContact] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [showContactForm, setShowContactForm] =
+    useState(false);
+
 
   // =========================================
   // GET CURRENT FIREBASE USER
   // =========================================
 
   const getCurrentUser = () => {
-    const auth = getAuth();
+
+    const auth =
+      getAuth();
+
     return auth.currentUser;
   };
 
+
   // =========================================
-  // LOAD TRUSTED CONTACT FROM DATABASE
+  // LOAD TRUSTED CONTACT
   // =========================================
 
-  const loadTrustedContact = async (user) => {
-    try {
-      setLoading(true);
+  const loadTrustedContact =
+    async (user) => {
 
-      const response = await fetch(
-        `${API_URL}/users/${user.uid}/trusted-contact`
-      );
+      if (!user) {
 
-      const data = await response.json();
-
-      if (data.success) {
-        setTrustedContact(data.trusted_contact || "");
-      } else {
         setTrustedContact("");
+        setLoadingContact(false);
+
+        return;
       }
-    } catch (error) {
-      console.error("LOAD TRUSTED CONTACT ERROR:", error);
-      setTrustedContact("");
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      try {
+
+        setLoadingContact(true);
+
+        const response =
+          await fetch(
+            `${API_URL}/users/${user.uid}/trusted-contact`
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          response.ok &&
+          data.success
+        ) {
+
+          const savedNumber =
+            data.trusted_contact || "";
+
+          setTrustedContact(
+            savedNumber
+          );
+
+          setContactInput(
+            savedNumber
+          );
+
+        } else {
+
+          setTrustedContact("");
+          setContactInput("");
+        }
+
+      } catch (error) {
+
+        console.error(
+          "LOAD TRUSTED CONTACT ERROR:",
+          error
+        );
+
+        setTrustedContact("");
+        setContactInput("");
+
+      } finally {
+
+        setLoadingContact(false);
+      }
+    };
+
 
   // =========================================
-  // CHECK LOGIN
+  // FIREBASE LOGIN
   // =========================================
 
   useEffect(() => {
-    const auth = getAuth();
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        loadTrustedContact(user);
-      } else {
-        setTrustedContact("");
-        setLoading(false);
-      }
-    });
+    const auth =
+      getAuth();
 
-    return () => unsubscribe();
-  }, []);
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        (user) => {
 
-  // =========================================
-  // SAVE TRUSTED CONTACT TO DATABASE
-  // =========================================
-
-  const saveTrustedContact = async (number) => {
-    try {
-      const user = getCurrentUser();
-
-      if (!user) {
-        alert("Please login first.");
-        return false;
-      }
-
-      const response = await fetch(
-        `${API_URL}/users/${user.uid}/trusted-contact`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            trusted_contact: number,
-          }),
+          loadTrustedContact(
+            user
+          );
         }
       );
 
-      const data = await response.json();
+    return () => {
+      unsubscribe();
+    };
 
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.error || "Failed to save trusted contact"
+  }, []);
+
+
+  // =========================================
+  // SAVE TRUSTED CONTACT
+  // =========================================
+
+  const saveTrustedContact =
+    async () => {
+
+      const user =
+        getCurrentUser();
+
+      if (!user) {
+
+        setMessage(
+          "Please log in first."
         );
+
+        return false;
       }
 
-      setTrustedContact(number);
+
+      // -----------------------------------------
+      // CLEAN NUMBER
+      // -----------------------------------------
+
+      const cleanedNumber =
+        contactInput.replace(
+          /\D/g,
+          ""
+        );
+
+
+      // -----------------------------------------
+      // VALIDATE NUMBER
+      // -----------------------------------------
+
+      if (
+        cleanedNumber.length <
+        10
+      ) {
+
+        setMessage(
+          "Please enter a valid WhatsApp number with country code."
+        );
+
+        return false;
+      }
+
+
+      // -----------------------------------------
+      // UPDATE UI IMMEDIATELY
+      // -----------------------------------------
+
+      setTrustedContact(
+        cleanedNumber
+      );
+
+      setContactInput(
+        cleanedNumber
+      );
+
+      setShowContactForm(
+        false
+      );
+
+      setMessage(
+        "Trusted contact saved."
+      );
+
+
+      // -----------------------------------------
+      // DATABASE SAVE IN BACKGROUND
+      // -----------------------------------------
+
+      setSavingContact(true);
+
+      try {
+
+        console.log(
+          "Saving trusted contact to PostgreSQL..."
+        );
+
+        const response =
+          await fetch(
+            `${API_URL}/users/${user.uid}/trusted-contact`,
+            {
+              method: "PUT",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body: JSON.stringify({
+                trusted_contact:
+                  cleanedNumber
+              })
+            }
+          );
+
+        const data =
+          await response.json();
+
+        console.log(
+          "TRUSTED CONTACT RESPONSE:",
+          data
+        );
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+
+          throw new Error(
+            data.error ||
+            "Failed to save trusted contact."
+          );
+        }
+
+        console.log(
+          "Trusted contact saved to PostgreSQL successfully."
+        );
+
+      } catch (error) {
+
+        console.error(
+          "SAVE TRUSTED CONTACT ERROR:",
+          error
+        );
+
+        /*
+         UI already shows the contact.
+         Inform user only if database failed.
+        */
+
+        setMessage(
+          "Contact updated, but database save failed."
+        );
+
+      } finally {
+
+        setSavingContact(false);
+      }
 
       return true;
-    } catch (error) {
-      console.error("SAVE TRUSTED CONTACT ERROR:", error);
+    };
 
-      alert("Could not save trusted contact.");
-
-      return false;
-    }
-  };
 
   // =========================================
   // CONTACT EMERGENCY SERVICES
   // =========================================
 
   const handleEmergency = () => {
-    // Detect whether the user is using a mobile device
+
     const isMobile =
       /Android|iPhone|iPad|iPod/i.test(
         navigator.userAgent
       );
 
     if (isMobile) {
-      // Mobile → open phone dialer
-      window.location.href = "tel:112";
+
+      window.location.href =
+        "tel:112";
+
     } else {
-      // Laptop/Desktop → cannot directly make phone call
+
       alert(
         "Emergency Number: 112\n\n" +
         "You are using MindCare AI on a laptop or desktop.\n\n" +
@@ -133,99 +316,135 @@ function SafetySupport({ onBackToChat }) {
     }
   };
 
+
   // =========================================
-  // WHATSAPP TRUSTED CONTACT
+  // OPEN TRUSTED CONTACT
   // =========================================
 
-  const handleTrustedContact = async () => {
-    let number = trustedContact;
+  const handleTrustedContact =
+    () => {
 
-    // Ask for number if not already saved
-    if (!number) {
-      const enteredNumber = window.prompt(
-        "Enter your trusted contact's WhatsApp number with country code.\nExample: +91 9876543210"
-      );
+      setMessage("");
 
-      if (!enteredNumber) {
+      if (!trustedContact) {
+
+        setContactInput("");
+
+        setShowContactForm(
+          true
+        );
+
         return;
       }
 
-      number = enteredNumber.replace(/\D/g, "");
+      openWhatsApp(
+        trustedContact
+      );
+    };
+
+
+  // =========================================
+  // OPEN WHATSAPP
+  // =========================================
+
+  const openWhatsApp =
+    (number) => {
 
       if (!number) {
-        alert(
-          "Please enter a valid WhatsApp number."
-        );
         return;
       }
 
-      // Save to PostgreSQL
-      const saved = await saveTrustedContact(number);
+      const message =
+        "Hi, I could use some support right now. Could you please contact me?";
 
-      if (!saved) {
-        return;
-      }
-    }
+      const whatsappURL =
+        `https://wa.me/${number}?text=${encodeURIComponent(
+          message
+        )}`;
 
-    // =========================================
-    // WHATSAPP MESSAGE
-    // =========================================
+      window.open(
+        whatsappURL,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    };
 
-    const message =
-      "Hi, I could use some support right now. Could you please contact me?";
-
-    const whatsappURL =
-      `https://wa.me/${number}?text=${encodeURIComponent(
-        message
-      )}`;
-
-    window.open(
-      whatsappURL,
-      "_blank",
-      "noopener,noreferrer"
-    );
-  };
 
   // =========================================
   // CHANGE TRUSTED CONTACT
   // =========================================
 
-  const changeTrustedContact = async () => {
-    const enteredNumber = window.prompt(
-      "Enter the new trusted contact's WhatsApp number with country code.\nExample: +91 9876543210"
-    );
+  const changeTrustedContact =
+    () => {
 
-    if (!enteredNumber) {
-      return;
-    }
-
-    const cleanedNumber =
-      enteredNumber.replace(/\D/g, "");
-
-    if (!cleanedNumber) {
-      alert(
-        "Please enter a valid WhatsApp number."
+      setContactInput(
+        trustedContact
       );
-      return;
-    }
 
-    const saved = await saveTrustedContact(
-      cleanedNumber
-    );
+      setMessage("");
 
-    if (saved) {
-      alert(
-        "Trusted contact updated successfully."
+      setShowContactForm(
+        true
       );
-    }
-  };
+    };
+
+
+  // =========================================
+  // CANCEL CONTACT EDIT
+  // =========================================
+
+  const cancelContactEdit =
+    () => {
+
+      setContactInput(
+        trustedContact
+      );
+
+      setMessage("");
+
+      setShowContactForm(
+        false
+      );
+    };
+
+
+  // =========================================
+  // SAVE + OPEN WHATSAPP
+  // =========================================
+
+  const saveAndMessage =
+    async () => {
+
+      const saved =
+        await saveTrustedContact();
+
+      if (saved) {
+
+        const cleanedNumber =
+          contactInput.replace(
+            /\D/g,
+            ""
+          );
+
+        openWhatsApp(
+          cleanedNumber
+        );
+      }
+    };
+
+
+  // =========================================
+  // UI
+  // =========================================
 
   return (
     <div className="safety-page">
 
       <div className="safety-card">
 
-        {/* HEADER */}
+        {/* =====================================
+            HEADER
+        ===================================== */}
 
         <div className="safety-icon">
           🛡️
@@ -235,7 +454,10 @@ function SafetySupport({ onBackToChat }) {
           Safety Support
         </h1>
 
-        {/* SUPPORT MESSAGE */}
+
+        {/* =====================================
+            SUPPORT MESSAGE
+        ===================================== */}
 
         <p className="safety-message">
           You're not alone. It may help to
@@ -248,64 +470,211 @@ function SafetySupport({ onBackToChat }) {
           services or go to the nearest hospital.
         </p>
 
-        {/* EMERGENCY */}
+
+        {/* =====================================
+            EMERGENCY
+        ===================================== */}
 
         <button
           type="button"
           className="safety-button emergency-button"
-          onClick={handleEmergency}
+          onClick={
+            handleEmergency
+          }
         >
-          <span>📞</span>
+
+          <span>
+            📞
+          </span>
 
           <span>
             Contact Emergency Services — 112
           </span>
+
         </button>
 
-        {/* WHATSAPP */}
+
+        {/* =====================================
+            WHATSAPP
+        ===================================== */}
 
         <button
           type="button"
           className="safety-button trusted-button"
-          onClick={handleTrustedContact}
-          disabled={loading}
+          onClick={
+            handleTrustedContact
+          }
+          disabled={
+            loadingContact
+          }
         >
-          <span>💬</span>
 
           <span>
-            {loading
-              ? "Loading..."
-              : "Message Someone I Trust on WhatsApp"}
+            💬
           </span>
+
+          <span>
+
+            {loadingContact
+              ? "Loading..."
+              : trustedContact
+                ? "Message Someone I Trust on WhatsApp"
+                : "Add Someone I Trust"}
+
+          </span>
+
         </button>
 
-        {/* CHANGE CONTACT */}
+
+        {/* =====================================
+            TRUSTED CONTACT FORM
+        ===================================== */}
+
+        {showContactForm && (
+
+          <div className="trusted-contact-form">
+
+            <h3>
+              Trusted Contact
+            </h3>
+
+            <p>
+              Enter the WhatsApp number with
+              country code.
+            </p>
+
+
+            <input
+              type="tel"
+              value={
+                contactInput
+              }
+              onChange={(e) =>
+                setContactInput(
+                  e.target.value
+                )
+              }
+              placeholder="+91 9876543210"
+              className="trusted-contact-input"
+            />
+
+
+            <div className="trusted-contact-actions">
+
+              <button
+                type="button"
+                className="save-contact-button"
+                onClick={
+                  saveAndMessage
+                }
+                disabled={
+                  savingContact
+                }
+              >
+
+                {savingContact
+                  ? "Saving..."
+                  : "Save & Message"}
+
+              </button>
+
+
+              <button
+                type="button"
+                className="cancel-contact-button"
+                onClick={
+                  cancelContactEdit
+                }
+                disabled={
+                  savingContact
+                }
+              >
+                Cancel
+              </button>
+
+            </div>
+
+          </div>
+
+        )}
+
+
+        {/* =====================================
+            CONTACT STATUS
+        ===================================== */}
+
+        {trustedContact &&
+          !showContactForm && (
+
+            <div className="trusted-contact-status">
+
+              <span>
+                ✓ Trusted contact added
+              </span>
+
+            </div>
+
+          )}
+
+
+        {/* =====================================
+            CHANGE CONTACT
+        ===================================== */}
 
         {trustedContact && (
+
           <button
             type="button"
             className="change-contact-button"
-            onClick={changeTrustedContact}
+            onClick={
+              changeTrustedContact
+            }
           >
             Change Trusted Contact
           </button>
+
         )}
 
-        {/* CONTINUE CHAT */}
+
+        {/* =====================================
+            MESSAGE
+        ===================================== */}
+
+        {message && (
+
+          <p className="trusted-contact-message">
+            {message}
+          </p>
+
+        )}
+
+
+        {/* =====================================
+            CONTINUE CHAT
+        ===================================== */}
 
         <button
           type="button"
           className="safety-button chat-button"
-          onClick={onBackToChat}
+          onClick={
+            onBackToChat
+          }
         >
-          <span>💬</span>
+
+          <span>
+            💬
+          </span>
 
           <span>
             Continue with MindCare AI
           </span>
+
         </button>
 
-        {/* DISCLAIMER */}
+
+        {/* =====================================
+            DISCLAIMER
+        ===================================== */}
 
         <div className="safety-disclaimer">
 

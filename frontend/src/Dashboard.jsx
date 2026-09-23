@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import "./App.css";
 
@@ -28,7 +27,9 @@ const API_URL = "http://127.0.0.1:5000";
 function Dashboard() {
   const [moods, setMoods] = useState([]);
   const [latestMood, setLatestMood] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  // Dashboard no longer waits for database
+  const [loading, setLoading] = useState(false);
 
   // =========================================
   // WELLNESS MODAL
@@ -130,7 +131,6 @@ function Dashboard() {
 
         setMoods([]);
         setLatestMood(null);
-        setLoading(false);
         return;
       }
 
@@ -139,7 +139,8 @@ function Dashboard() {
         user.uid
       );
 
-      setLoading(true);
+      // Do NOT set loading=true here.
+      // Dashboard remains visible while data loads.
 
       const response = await fetch(
         `${API_URL}/moods/${user.uid}`
@@ -150,7 +151,7 @@ function Dashboard() {
       if (!response.ok || !data.success) {
         throw new Error(
           data.error ||
-            "Failed to load mood data"
+          "Failed to load mood data"
         );
       }
 
@@ -164,29 +165,26 @@ function Dashboard() {
 
       /*
         Backend returns newest records first.
-
-        We reverse them so the dashboard stores:
-        oldest → newest
-
-        This makes latestMood easy to calculate
-        using the last item.
+        Reverse them so dashboard stores:
+        oldest → newest.
       */
 
-      const fixedMoods = [...savedMoods]
-        .reverse()
-        .map((item) => {
+      const fixedMoods =
+        [...savedMoods]
+          .reverse()
+          .map((item) => {
 
-          const validDate =
-            getValidDate(item);
+            const validDate =
+              getValidDate(item);
 
-          return {
-            ...item,
+            return {
+              ...item,
 
-            date: validDate
-              ? validDate.toISOString()
-              : new Date().toISOString(),
-          };
-        });
+              date: validDate
+                ? validDate.toISOString()
+                : new Date().toISOString(),
+            };
+          });
 
       setMoods(fixedMoods);
 
@@ -208,9 +206,6 @@ function Dashboard() {
 
       setMoods([]);
       setLatestMood(null);
-
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -244,10 +239,11 @@ function Dashboard() {
   // VOICE RECORDS
   // =========================================
 
-  const voiceRecords = moods.filter(
-    (item) =>
-      item.source === "voice"
-  ).length;
+  const voiceRecords =
+    moods.filter(
+      (item) =>
+        item.source === "voice"
+    ).length;
 
   // =========================================
   // MOST COMMON MOOD
@@ -307,7 +303,6 @@ function Dashboard() {
 
   const getRecommendation = (emotion) => {
     const recommendations = {
-
       Happy: {
         music:
           "Upbeat & energetic music",
@@ -658,54 +653,6 @@ function Dashboard() {
   const closeWellness = () => {
     setSelectedWellness(null);
   };
-
-  // =========================================
-  // LOADING SCREEN
-  // =========================================
-
-  if (loading) {
-    return (
-      <div className="dashboard-home">
-
-        <div className="dashboard-welcome">
-
-          <div>
-            <h2>
-              Welcome to MindCare AI 💙
-            </h2>
-
-            <p>
-              Your personal AI wellness
-              companion. Track your mood,
-              understand your emotions,
-              and take care of your mind.
-            </p>
-          </div>
-
-          <div className="dashboard-welcome-icon">
-            🧠
-          </div>
-
-        </div>
-
-        <div className="dashboard-empty">
-
-          <div>📊</div>
-
-          <h3>
-            Loading your dashboard...
-          </h3>
-
-          <p>
-            Retrieving your personal mood
-            records.
-          </p>
-
-        </div>
-
-      </div>
-    );
-  }
 
   // =========================================
   // UI
@@ -1765,4 +1712,3 @@ function Dashboard() {
 }
 
 export default Dashboard;
-

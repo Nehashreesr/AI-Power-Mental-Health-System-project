@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import "./App.css";
 
@@ -23,7 +22,10 @@ const API_URL = "http://127.0.0.1:5000";
 function MoodAnalytics() {
   const [moodData, setMoodData] = useState([]);
   const [trendData, setTrendData] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  // Do not block the page while database loads
+  const [loading, setLoading] = useState(false);
+
   const [message, setMessage] = useState("");
 
   // =========================================
@@ -89,19 +91,31 @@ function MoodAnalytics() {
   const loadMoodData = async (user) => {
     try {
       if (!user) {
-        console.log("No Firebase user found.");
+        console.log(
+          "MoodAnalytics: No Firebase user found."
+        );
+
         setMoodData([]);
         setTrendData([]);
-        setLoading(false);
+
         return;
       }
 
       console.log(
-        "Loading analytics for Firebase UID:",
+        "MoodAnalytics - Firebase UID:",
         user.uid
       );
 
-      setLoading(true);
+      /*
+        IMPORTANT:
+
+        We do NOT set loading=true here.
+
+        This allows the analytics page to
+        display immediately while PostgreSQL
+        data loads in the background.
+      */
+
       setMessage("");
 
       const response = await fetch(
@@ -112,14 +126,16 @@ function MoodAnalytics() {
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.error || "Failed to load mood data"
+          data.error ||
+            "Failed to load mood data"
         );
       }
 
-      const savedMoods = data.moods || [];
+      const savedMoods =
+        data.moods || [];
 
       console.log(
-        "Moods received from PostgreSQL:",
+        "MoodAnalytics - PostgreSQL moods:",
         savedMoods
       );
 
@@ -127,76 +143,100 @@ function MoodAnalytics() {
       // MOOD DISTRIBUTION
       // =======================================
 
-      const calculatedData = moods.map((item) => {
-        const count = savedMoods.filter((entry) => {
-          const savedEmotion =
-            entry.emotion ||
-            entry.mood ||
-            "";
+      const calculatedData =
+        moods.map((item) => {
 
-          return (
-            savedEmotion.toLowerCase() ===
-            item.mood.toLowerCase()
-          );
-        }).length;
+          const count =
+            savedMoods.filter(
+              (entry) => {
 
-        return {
-          ...item,
-          count,
-        };
-      });
+                const savedEmotion =
+                  entry.emotion ||
+                  entry.mood ||
+                  "";
 
-      setMoodData(calculatedData);
+                return (
+                  savedEmotion.toLowerCase() ===
+                  item.mood.toLowerCase()
+                );
+              }
+            ).length;
+
+          return {
+            ...item,
+            count,
+          };
+        });
+
+      setMoodData(
+        calculatedData
+      );
 
       // =======================================
       // MOOD TREND
       // =======================================
 
-      const trend = savedMoods
-        .map((entry, index) => {
-          const emotion =
-            entry.emotion ||
-            entry.mood ||
-            "Neutral";
+      const trend =
+        savedMoods
+          .map(
+            (entry, index) => {
 
-          const score =
-            moodScores[emotion] || 3;
+              const emotion =
+                entry.emotion ||
+                entry.mood ||
+                "Neutral";
 
-          return {
-            name: `Record ${index + 1}`,
-            emotion: emotion,
-            score: score,
+              const score =
+                moodScores[emotion] ||
+                3;
 
-            // PostgreSQL timestamp
-            date:
-              entry.created_at ||
-              entry.date ||
-              "",
+              return {
+                name:
+                  `Record ${index + 1}`,
 
-            // Mood tracker or voice
-            source:
-              entry.source ||
-              "mood",
+                emotion:
+                  emotion,
 
-            // Note from Mood Tracker
-            note:
-              entry.note ||
-              "",
-          };
-        })
-        .filter(
-          (item) => item.emotion
-        );
+                score:
+                  score,
 
-      // Reverse because backend gives newest first.
-      // This makes the graph show oldest → newest.
+                date:
+                  entry.created_at ||
+                  entry.date ||
+                  "",
+
+                source:
+                  entry.source ||
+                  "mood",
+
+                note:
+                  entry.note ||
+                  "",
+              };
+            }
+          )
+          .filter(
+            (item) =>
+              item.emotion
+          );
+
+      /*
+        Backend returns newest first.
+
+        Reverse it so graph becomes:
+        oldest → newest
+      */
+
       trend.reverse();
 
-      setTrendData(trend);
+      setTrendData(
+        trend
+      );
 
     } catch (error) {
+
       console.error(
-        "Error loading mood data:",
+        "MoodAnalytics - Error loading mood data:",
         error
       );
 
@@ -206,8 +246,7 @@ function MoodAnalytics() {
       setMessage(
         "Could not load your mood data."
       );
-    } finally {
-      setLoading(false);
+
     }
   };
 
@@ -229,6 +268,39 @@ function MoodAnalytics() {
     return () => {
       unsubscribe();
     };
+  }, []);
+
+  // =========================================
+  // LISTEN FOR NEW MOOD
+  // =========================================
+
+  useEffect(() => {
+
+    const handleMoodUpdated = () => {
+
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      if (user) {
+        loadMoodData(user);
+      }
+
+    };
+
+    window.addEventListener(
+      "moodUpdated",
+      handleMoodUpdated
+    );
+
+    return () => {
+
+      window.removeEventListener(
+        "moodUpdated",
+        handleMoodUpdated
+      );
+
+    };
+
   }, []);
 
   // =========================================
@@ -267,15 +339,20 @@ function MoodAnalytics() {
     ).length;
 
   // =========================================
-  // CLEAR USER'S MOODS
+  // CLEAR USER MOODS
   // =========================================
 
   const clearMoods = async () => {
+
     const auth = getAuth();
-    const user = auth.currentUser;
+
+    const user =
+      auth.currentUser;
 
     if (!user) {
-      setMessage("Please login first.");
+      setMessage(
+        "Please login first."
+      );
       return;
     }
 
@@ -289,6 +366,7 @@ function MoodAnalytics() {
     }
 
     try {
+
       setMessage(
         "Clear Data requires a delete endpoint in the backend."
       );
@@ -298,16 +376,8 @@ function MoodAnalytics() {
         user.uid
       );
 
-      /*
-        We are intentionally NOT deleting localStorage
-        because mood data is now stored in PostgreSQL.
-
-        When we add DELETE /moods/<firebase_uid>
-        to Flask, this button can permanently delete
-        only this user's database records.
-      */
-
     } catch (error) {
+
       console.error(
         "CLEAR MOODS ERROR:",
         error
@@ -316,6 +386,7 @@ function MoodAnalytics() {
       setMessage(
         "Could not clear mood data."
       );
+
     }
   };
 
@@ -326,11 +397,15 @@ function MoodAnalytics() {
   const getEmotionEmoji = (
     emotion
   ) => {
-    const item = moods.find(
-      (mood) =>
-        mood.mood.toLowerCase() ===
-        emotion.toLowerCase()
-    );
+
+    const item =
+      moods.find(
+        (mood) =>
+          mood.mood.toLowerCase() ===
+          String(
+            emotion
+          ).toLowerCase()
+      );
 
     return item
       ? item.emoji
@@ -344,11 +419,15 @@ function MoodAnalytics() {
   const getEmotionColor = (
     emotion
   ) => {
-    const item = moods.find(
-      (mood) =>
-        mood.mood.toLowerCase() ===
-        emotion.toLowerCase()
-    );
+
+    const item =
+      moods.find(
+        (mood) =>
+          mood.mood.toLowerCase() ===
+          String(
+            emotion
+          ).toLowerCase()
+      );
 
     return item
       ? item.color
@@ -360,16 +439,23 @@ function MoodAnalytics() {
   // =========================================
 
   const formatDate = (date) => {
+
     if (!date) {
       return "";
     }
 
     try {
+
       return new Date(
         date
-      ).toLocaleString();
+      ).toLocaleString(
+        "en-IN"
+      );
+
     } catch {
+
       return "";
+
     }
   };
 
@@ -384,52 +470,11 @@ function MoodAnalytics() {
     );
 
   // =========================================
-  // LOADING SCREEN
-  // =========================================
-
-  if (loading) {
-    return (
-      <div className="analytics-page">
-
-        <div className="analytics-header">
-          <div>
-            <h2>
-              Mood Analytics 📈
-            </h2>
-
-            <p>
-              Track and understand your
-              emotional patterns.
-            </p>
-          </div>
-        </div>
-
-        <div className="no-data">
-
-          <div>
-            📊
-          </div>
-
-          <h3>
-            Loading your mood data...
-          </h3>
-
-          <p>
-            Please wait while we retrieve
-            your records.
-          </p>
-
-        </div>
-
-      </div>
-    );
-  }
-
-  // =========================================
   // UI
   // =========================================
 
   return (
+
     <div className="analytics-page">
 
       {/* =====================================
@@ -464,10 +509,14 @@ function MoodAnalytics() {
 
       </div>
 
+      {/* MESSAGE */}
+
       {message && (
+
         <p className="mood-message">
           {message}
         </p>
+
       )}
 
       {/* =====================================
@@ -763,17 +812,21 @@ function MoodAnalytics() {
                         />
 
                         <span>
+
                           {item.emoji}{" "}
                           {item.mood}
+
                         </span>
 
                       </div>
 
                       <strong>
+
                         {Math.round(
                           percentage
                         )}
                         %
+
                       </strong>
 
                     </div>
@@ -802,8 +855,10 @@ function MoodAnalytics() {
         </h3>
 
         <p className="trend-description">
+
           See how your mood changes across
           your recorded entries.
+
         </p>
 
         {trendData.length === 0 ? (
@@ -898,10 +953,13 @@ function MoodAnalytics() {
                       "Neutral";
 
                     return [
+
                       `${getEmotionEmoji(
                         emotion
                       )} ${emotion}`,
+
                       "Mood",
+
                     ];
 
                   }}
@@ -1062,9 +1120,11 @@ function MoodAnalytics() {
                       </span>
 
                       {item.note && (
+
                         <small>
                           📝 {item.note}
                         </small>
+
                       )}
 
                     </div>
@@ -1112,9 +1172,12 @@ function MoodAnalytics() {
               mood is{" "}
 
               <strong>
+
                 {mostCommonMood.emoji}{" "}
                 {mostCommonMood.mood}
+
               </strong>
+
               .
 
               {" "}
@@ -1146,4 +1209,3 @@ function MoodAnalytics() {
 }
 
 export default MoodAnalytics;
-

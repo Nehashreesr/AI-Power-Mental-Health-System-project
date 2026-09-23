@@ -10,7 +10,9 @@ const API_URL = "http://127.0.0.1:5000";
 
 function AIWellness() {
   const [latestMood, setLatestMood] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  // Do not block the page while PostgreSQL is loading
+  const [loading, setLoading] = useState(false);
 
   // =========================================
   // LOAD LATEST MOOD FROM POSTGRESQL
@@ -24,7 +26,6 @@ function AIWellness() {
         );
 
         setLatestMood(null);
-        setLoading(false);
         return;
       }
 
@@ -32,8 +33,6 @@ function AIWellness() {
         "AI Wellness - Firebase UID:",
         user.uid
       );
-
-      setLoading(true);
 
       const response = await fetch(
         `${API_URL}/moods/${user.uid}`
@@ -97,6 +96,11 @@ function AIWellness() {
       onAuthStateChanged(
         auth,
         (user) => {
+          /*
+           Do not show a blocking loading screen.
+           AI Wellness opens immediately.
+          */
+
           loadLatestMood(user);
         }
       );
@@ -273,6 +277,7 @@ function AIWellness() {
       emoji: "😮",
       title:
         "You're experiencing something unexpected",
+
       message:
         "Take a moment to understand how you're feeling.",
 
@@ -292,6 +297,7 @@ function AIWellness() {
     Anxious: {
       emoji: "😟",
       title: "You may be feeling anxious",
+
       message:
         "Try slowing down and focusing on your breathing.",
 
@@ -336,63 +342,15 @@ function AIWellness() {
   }
 
   // =========================================
-  // LOADING UI
-  // =========================================
-
-  if (loading) {
-    return (
-      <div className="wellness-page">
-
-        <div className="wellness-header">
-
-          <div className="wellness-main-icon">
-            🤖
-          </div>
-
-          <div>
-
-            <h2>
-              AI Wellness Recommendations
-            </h2>
-
-            <p>
-              Personalized music and exercise
-              suggestions based on your latest mood.
-            </p>
-
-          </div>
-
-        </div>
-
-        <div className="wellness-empty">
-
-          <div className="wellness-empty-icon">
-            ⏳
-          </div>
-
-          <h3>
-            Loading your wellness data...
-          </h3>
-
-          <p>
-            Please wait while we retrieve
-            your latest mood.
-          </p>
-
-        </div>
-
-      </div>
-    );
-  }
-
-  // =========================================
   // UI
   // =========================================
 
   return (
     <div className="wellness-page">
 
-      {/* HEADER */}
+      {/* =====================================
+          HEADER
+      ===================================== */}
 
       <div className="wellness-header">
 
@@ -415,9 +373,11 @@ function AIWellness() {
 
       </div>
 
-      {/* NO MOOD */}
+      {/* =====================================
+          NO MOOD
+      ===================================== */}
 
-      {!latestMood && (
+      {!latestMood && !loading && (
 
         <div className="wellness-empty">
 
@@ -438,7 +398,33 @@ function AIWellness() {
 
       )}
 
-      {/* MOOD FOUND BUT UNKNOWN */}
+      {/* =====================================
+          BACKGROUND LOADING
+      ===================================== */}
+
+      {!latestMood && loading && (
+
+        <div className="wellness-empty">
+
+          <div className="wellness-empty-icon">
+            🤖
+          </div>
+
+          <h3>
+            Preparing your wellness recommendations...
+          </h3>
+
+          <p>
+            Loading your latest mood.
+          </p>
+
+        </div>
+
+      )}
+
+      {/* =====================================
+          MOOD FOUND BUT UNKNOWN
+      ===================================== */}
 
       {latestMood && !recommendation && (
 
@@ -471,7 +457,9 @@ function AIWellness() {
 
       )}
 
-      {/* RECOMMENDATIONS */}
+      {/* =====================================
+          RECOMMENDATIONS
+      ===================================== */}
 
       {latestMood && recommendation && (
 

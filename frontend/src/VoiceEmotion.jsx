@@ -146,18 +146,26 @@ function VoiceEmotion() {
 
         setRecording(false);
 
+        // Stop processor
         if (
           processorRef.current
         ) {
+
           processorRef.current.disconnect();
+
+          processorRef.current.onaudioprocess =
+            null;
         }
 
+        // Stop source
         if (
           sourceRef.current
         ) {
+
           sourceRef.current.disconnect();
         }
 
+        // Stop microphone
         if (
           streamRef.current
         ) {
@@ -173,16 +181,20 @@ function VoiceEmotion() {
         if (
           !audioContextRef.current
         ) {
+
           throw new Error(
             "Audio context is not available."
           );
         }
 
+        const sampleRate =
+          audioContextRef.current
+            .sampleRate;
+
         const audioBlob =
           createWavBlob(
             audioDataRef.current,
-            audioContextRef.current
-              .sampleRate
+            sampleRate
           );
 
         console.log(
@@ -191,6 +203,32 @@ function VoiceEmotion() {
           "bytes"
         );
 
+        // Close audio context
+        try {
+
+          await audioContextRef.current.close();
+
+        } catch (closeError) {
+
+          console.log(
+            "Audio context close:",
+            closeError
+          );
+        }
+
+        audioContextRef.current =
+          null;
+
+        processorRef.current =
+          null;
+
+        sourceRef.current =
+          null;
+
+        streamRef.current =
+          null;
+
+        // Send audio for analysis
         await sendAudio(
           audioBlob
         );
@@ -414,7 +452,7 @@ function VoiceEmotion() {
     };
 
   // =========================================
-  // SEND AUDIO
+  // SEND AUDIO TO BACKEND
   // =========================================
 
   const sendAudio =
@@ -476,6 +514,10 @@ function VoiceEmotion() {
           );
         }
 
+        // =====================================
+        // SHOW RESULT IMMEDIATELY
+        // =====================================
+
         setEmotion(
           data.emotion
         );
@@ -484,10 +526,33 @@ function VoiceEmotion() {
           data.confidence
         );
 
-        // Save to PostgreSQL
-        await saveMood(
+        /*
+         IMPORTANT:
+
+         Do NOT wait for PostgreSQL here.
+
+         The emotion result is already available,
+         so show it immediately.
+        */
+
+        setLoading(false);
+
+        // =====================================
+        // SAVE MOOD IN BACKGROUND
+        // =====================================
+
+        saveMood(
           data.emotion,
           data.confidence
+        ).catch(
+          (saveError) => {
+
+            console.error(
+              "Background mood save error:",
+              saveError
+            );
+
+          }
         );
 
       } catch (err) {
@@ -501,8 +566,6 @@ function VoiceEmotion() {
           err.message ||
             "Voice analysis failed"
         );
-
-      } finally {
 
         setLoading(false);
       }
@@ -529,6 +592,10 @@ function VoiceEmotion() {
             "User is not logged in."
           );
         }
+
+        console.log(
+          "Saving voice mood to PostgreSQL..."
+        );
 
         const response =
           await fetch(
@@ -576,8 +643,10 @@ function VoiceEmotion() {
           data
         );
 
-        // Tell Dashboard / Analytics / Wellness
-        // to reload their data
+        // =====================================
+        // UPDATE OTHER COMPONENTS
+        // =====================================
+
         window.dispatchEvent(
           new Event(
             "moodUpdated"
@@ -591,7 +660,15 @@ function VoiceEmotion() {
           err
         );
 
-        throw err;
+        /*
+         Do not show a blocking error
+         after the emotion has already
+         been detected successfully.
+        */
+
+        console.log(
+          "Emotion detected successfully, but database save failed."
+        );
       }
     };
 
@@ -651,6 +728,10 @@ function VoiceEmotion() {
           will analyze your voice emotion.
         </p>
 
+        {/* ===================================
+            RECORD BUTTON
+        =================================== */}
+
         {!recording ? (
 
           <button
@@ -676,26 +757,49 @@ function VoiceEmotion() {
 
         )}
 
+        {/* ===================================
+            RECORDING
+        =================================== */}
+
         {recording && (
+
           <p className="recording-text">
             🔴 Recording... Speak now
           </p>
+
         )}
 
+        {/* ===================================
+            ANALYZING
+        =================================== */}
+
         {loading && (
+
           <p className="voice-loading">
             🤖 Analyzing your voice...
           </p>
+
         )}
 
+        {/* ===================================
+            ERROR
+        =================================== */}
+
         {error && (
+
           <div className="voice-error">
             ❌ {error}
           </div>
+
         )}
+
+        {/* ===================================
+            EMOTION RESULT
+        =================================== */}
 
         {emotion &&
           !loading && (
+
             <div className="emotion-result">
 
               <div className="emotion-result-icon">
@@ -715,6 +819,7 @@ function VoiceEmotion() {
               </div>
 
               {confidence !== null && (
+
                 <div className="confidence">
 
                   Confidence:{" "}
@@ -726,6 +831,7 @@ function VoiceEmotion() {
                   %
 
                 </div>
+
               )}
 
               <p>
@@ -733,6 +839,7 @@ function VoiceEmotion() {
               </p>
 
             </div>
+
           )}
 
       </div>
