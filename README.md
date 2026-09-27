@@ -157,7 +157,7 @@ HF_TOKEN=your_huggingface_access_token
        │  Authentication │
        └─────────────────┘
 
-How the Application Works
+## How the Application Works
 1. User Login
 
 The user signs in using Firebase Authentication.
@@ -200,7 +200,7 @@ The Safety Support section provides general emergency information and allows use
 
 Project Status
 
-Completed
+## Completed
 
 MindCare AI was developed as a final-year engineering project to demonstrate the integration of:
 
