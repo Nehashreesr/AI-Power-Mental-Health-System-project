@@ -122,7 +122,6 @@ HF_TOKEN=your_huggingface_access_token
 - Voice Emotion Recognition
 - `superb/hubert-large-superb-er`
 
----
 
 ## System Architecture
 
