@@ -84,7 +84,6 @@ The Flask backend communicates with Hugging Face to access AI model capabilities
 
 The Hugging Face API is authenticated using a **Hugging Face Access Token (`HF_TOKEN`)** stored securely in the backend `.env` file.
 
-```env
 HF_TOKEN=your_huggingface_access_token
 
 ---
@@ -214,4 +213,3 @@ Machine Learning
 Voice Emotion Recognition
 Data Visualization
 Wellness-oriented user features
-
