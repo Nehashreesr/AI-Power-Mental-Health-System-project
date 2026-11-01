@@ -10,6 +10,150 @@ import { auth } from "./firebase";
 const API_URL =
   "http://127.0.0.1:5000";
 
+// =========================================
+// WELLNESS INDICATOR (low mood / stress-anxiety signs)
+// =========================================
+/*
+ The voice model detects Happy, Neutral, Sad and Angry.
+ It cannot diagnose depression or anxiety, so this gives a
+ wellness INDICATOR: it looks at the current result and at
+ the user's last few voice check-ins and flags patterns of
+ low mood (depression-related) or tension (stress/anxiety-related).
+*/
+const VOICE_HISTORY_LIMIT = 10;
+const VOICE_WINDOW = 5;
+
+const LOW_MOOD_EMOTIONS = ["Sad"];
+const TENSION_EMOTIONS = ["Angry", "Anxious", "Fear"];
+
+const voiceHistoryKey = (uid) =>
+  `mindcareVoiceHistory_${uid}`;
+
+const loadVoiceHistory = (uid) => {
+  try {
+    const raw = localStorage.getItem(voiceHistoryKey(uid));
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+};
+
+const addToVoiceHistory = (uid, emotion, confidence) => {
+  const list = loadVoiceHistory(uid);
+  list.push({ emotion, confidence, time: Date.now() });
+  const trimmed = list.slice(-VOICE_HISTORY_LIMIT);
+  try {
+    localStorage.setItem(
+      voiceHistoryKey(uid),
+      JSON.stringify(trimmed)
+    );
+  } catch {
+    // Storage full or blocked: the indicator still works for this result.
+  }
+  return trimmed;
+};
+
+const analyzeWellness = (emotion, confidence, history) => {
+  const recent = history.slice(-VOICE_WINDOW);
+  const sadCount = recent.filter((item) =>
+    LOW_MOOD_EMOTIONS.includes(item.emotion)
+  ).length;
+  const tenseCount = recent.filter((item) =>
+    TENSION_EMOTIONS.includes(item.emotion)
+  ).length;
+  const distressCount = sadCount + tenseCount;
+
+  const currentLow = LOW_MOOD_EMOTIONS.includes(emotion);
+  const currentTense = TENSION_EMOTIONS.includes(emotion);
+  const strong = Number(confidence) >= 0.5;
+
+  // What kind of signs dominate?
+  let kind = "none";
+  if (sadCount > 0 && tenseCount > 0 && Math.abs(sadCount - tenseCount) <= 1) {
+    kind = "mixed";
+  } else if (sadCount >= tenseCount && sadCount > 0) {
+    kind = "low";
+  } else if (tenseCount > 0) {
+    kind = "tense";
+  }
+
+  const titles = {
+    low: "Possible low-mood (depression-related) signs",
+    tense: "Possible stress / anxiety-related signs",
+    mixed: "Possible emotional distress (low mood and stress)"
+  };
+
+  const details = {
+    low: "Your voice sounds sad or low in energy.",
+    tense: "Your voice sounds tense or irritated.",
+    mixed: "Your voice shows both sadness and tension."
+  };
+
+  // HIGH: most recent check-ins show distress
+  if (recent.length >= VOICE_WINDOW && distressCount >= 4) {
+    return {
+      level: "high",
+      levelLabel: "High",
+      color: "#ef4444",
+      title: titles[kind],
+      detail:
+        `${distressCount} of your last ${recent.length} voice check-ins ` +
+        "showed these signs. This looks like a repeated pattern.",
+      tip:
+        "Please consider talking to a trusted person or a mental " +
+        "health professional. You can also open the Safety Support page.",
+      sessions: recent.length
+    };
+  }
+
+  // MODERATE: repeated signs
+  if (sadCount >= 3 || tenseCount >= 3) {
+    return {
+      level: "moderate",
+      levelLabel: "Moderate",
+      color: "#f97316",
+      title: titles[kind],
+      detail:
+        `${distressCount} of your last ${recent.length} voice check-ins ` +
+        "showed these signs.",
+      tip:
+        "Try a break, slow breathing, a walk, or talking to someone " +
+        "you trust. If this continues, speak to a professional.",
+      sessions: recent.length
+    };
+  }
+
+  // MILD: this recording alone
+  if ((currentLow || currentTense) && strong) {
+    const single = currentLow ? "low" : "tense";
+    return {
+      level: "mild",
+      levelLabel: "Mild",
+      color: "#eab308",
+      title: titles[single],
+      detail:
+        details[single] +
+        " One recording is not enough to see a pattern.",
+      tip:
+        "Check in again over the next few days so MindCare AI can " +
+        "see whether this continues.",
+      sessions: recent.length
+    };
+  }
+
+  // NONE
+  return {
+    level: "none",
+    levelLabel: "No concerning signs",
+    color: "#22c55e",
+    title: "No signs of low mood or stress detected",
+    detail: "Your voice does not show a concerning pattern right now.",
+    tip: "Keep checking in regularly to track how you feel over time.",
+    sessions: recent.length
+  };
+};
+
 function VoiceEmotion() {
 
   const [recording, setRecording] =
@@ -26,6 +170,8 @@ function VoiceEmotion() {
 
   const [error, setError] =
     useState("");
+  const [wellness, setWellness] =
+    useState(null);
 
   const streamRef =
     useRef(null);
@@ -54,6 +200,7 @@ function VoiceEmotion() {
         setError("");
         setEmotion("");
         setConfidence(null);
+        setWellness(null);
 
         const stream =
           await navigator.mediaDevices.getUserMedia(
@@ -526,6 +673,23 @@ function VoiceEmotion() {
           data.confidence
         );
 
+        // =====================================
+        // WELLNESS INDICATOR (low mood / stress)
+        // =====================================
+        const history = addToVoiceHistory(
+          user.uid,
+          data.emotion,
+          data.confidence
+        );
+
+        setWellness(
+          analyzeWellness(
+            data.emotion,
+            data.confidence,
+            history
+          )
+        );
+
         /*
          IMPORTANT:
 
@@ -837,6 +1001,51 @@ function VoiceEmotion() {
               <p>
                 💾 Mood saved to Mood Analytics
               </p>
+
+              {wellness && (
+                <div
+                  className="wellness-indicator"
+                  style={{
+                    marginTop: "18px",
+                    padding: "14px 16px",
+                    borderRadius: "12px",
+                    borderLeft: `5px solid ${wellness.color}`,
+                    background: "rgba(127,127,127,0.12)",
+                    textAlign: "left"
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: "6px" }}>
+                    🩺 Wellness indicator:{" "}
+                    <span style={{ color: wellness.color }}>
+                      {wellness.levelLabel}
+                    </span>
+                  </div>
+
+                  <div style={{ fontWeight: 600 }}>
+                    {wellness.title}
+                  </div>
+
+                  <p style={{ margin: "6px 0" }}>
+                    {wellness.detail}
+                  </p>
+
+                  <p style={{ margin: "6px 0" }}>
+                    💡 {wellness.tip}
+                  </p>
+
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      opacity: 0.75,
+                      margin: "10px 0 0"
+                    }}
+                  >
+                    This is a wellness indicator based on voice tone
+                    only. It is not a medical diagnosis. Only a doctor
+                    or psychologist can diagnose depression or anxiety.
+                  </p>
+                </div>
+              )}
 
             </div>
 

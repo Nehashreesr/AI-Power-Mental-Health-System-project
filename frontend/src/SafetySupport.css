@@ -399,3 +399,233 @@
   }
 
 }
+
+
+/* =====================================
+   MENTAL HEALTH SUPPORT SECTION
+===================================== */
+
+.mental-health-support {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 22px 0;
+  padding: 20px;
+  background: #f4f0ff;
+  border: 1px solid #ded4ff;
+  border-radius: 16px;
+  text-align: left;
+}
+
+.mental-health-support h2 {
+  color: #55349b;
+  font-size: 21px;
+  margin-bottom: 10px;
+}
+
+.mental-health-support > p {
+  color: #555;
+  font-size: 14px;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+
+.mental-health-contact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: #fff;
+  border: 1px solid #ded4ff;
+  border-radius: 12px;
+}
+
+.mental-health-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mental-health-info h3 {
+  color: #55349b;
+  font-size: 15px;
+  margin-bottom: 5px;
+}
+
+.mental-health-info p {
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.mental-health-info strong {
+  color: #333;
+  font-size: 15px;
+}
+
+.doctor-call-button {
+  padding: 10px 14px;
+  background: #6844b5;
+  color: white;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: 0.3s;
+}
+
+.doctor-call-button:hover {
+  background: #4f3293;
+  transform: translateY(-2px);
+}
+
+.mental-health-support small {
+  display: block;
+  margin-top: 15px;
+  color: #666;
+  text-align: center;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .mental-health-support {
+    padding: 14px;
+  }
+
+  .mental-health-contact {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .doctor-call-button {
+    padding: 9px;
+    font-size: 12px;
+  }
+}
+
+
+/* =====================================
+   TRUSTED CONTACT FORM
+===================================== */
+
+.trusted-contact-form {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 20px 0;
+  padding: 22px;
+  background: #f8f5ff;
+  border: 1px solid #ded4ff;
+  border-radius: 16px;
+  text-align: left;
+}
+
+.trusted-contact-form h3 {
+  color: #55349b;
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.trusted-contact-form p {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+/* INPUT FIELD */
+
+.trusted-contact-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 15px;
+  border: 1px solid #cfc3e8;
+  border-radius: 10px;
+  outline: none;
+  background: #fff;
+  color: #333;
+  font-size: 15px;
+  transition: 0.3s;
+}
+
+.trusted-contact-input:focus {
+  border-color: #7651bd;
+  box-shadow: 0 0 0 3px rgba(118, 81, 189, 0.12);
+}
+
+/* BUTTON CONTAINER */
+
+.trusted-contact-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+/* SAVE BUTTON */
+
+.save-contact-button {
+  flex: 1;
+  padding: 13px 16px;
+  background: #6844b5;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.save-contact-button:hover {
+  background: #50318f;
+  transform: translateY(-2px);
+}
+
+.save-contact-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* CANCEL BUTTON */
+
+.cancel-contact-button {
+  flex: 1;
+  padding: 13px 16px;
+  background: #fff;
+  color: #6844b5;
+  border: 1px solid #6844b5;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.cancel-contact-button:hover {
+  background: #eee7fa;
+}
+
+.cancel-contact-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* MOBILE RESPONSIVE */
+
+@media (max-width: 480px) {
+
+  .trusted-contact-form {
+    padding: 16px;
+  }
+
+  .trusted-contact-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .save-contact-button,
+  .cancel-contact-button {
+    width: 100%;
+    padding: 13px;
+  }
+}

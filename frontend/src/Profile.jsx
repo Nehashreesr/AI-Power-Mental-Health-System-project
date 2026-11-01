@@ -1,6 +1,9 @@
+
 import React, { useEffect, useState } from "react";
 import "./Profile.css";
+
 import { auth } from "./firebase";
+
 import {
   signOut,
   onAuthStateChanged
@@ -15,25 +18,26 @@ const defaultProfile = {
 };
 
 function Profile() {
+
   const [isEditing, setIsEditing] = useState(false);
 
-  const [profile, setProfile] =
-    useState(defaultProfile);
+  const [profile, setProfile] = useState(defaultProfile);
 
-  const [formData, setFormData] =
-    useState(defaultProfile);
+  const [formData, setFormData] = useState(defaultProfile);
 
-  const [message, setMessage] =
-    useState("");
+  const [message, setMessage] = useState("");
 
-  const [saving, setSaving] =
-    useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+
 
   // =========================================
   // SYNCHRONIZE PROFILE
   // =========================================
 
   const synchronizeProfile = (updatedProfile) => {
+
     setProfile(updatedProfile);
     setFormData(updatedProfile);
 
@@ -43,162 +47,143 @@ function Profile() {
     );
 
     window.dispatchEvent(
-      new CustomEvent(
-        "mindcareProfileUpdated",
-        {
-          detail: updatedProfile
-        }
-      )
+      new CustomEvent("mindcareProfileUpdated", {
+        detail: updatedProfile
+      })
     );
   };
 
+
   // =========================================
-  // LOAD PROFILE
+  // LOAD PROFILE FROM DATABASE
   // =========================================
 
   useEffect(() => {
 
-    // Load cached profile immediately
     const savedProfile =
-      localStorage.getItem(
-        "mindcareProfile"
-      );
+      localStorage.getItem("mindcareProfile");
 
     if (savedProfile) {
+
       try {
-        const parsedProfile =
-          JSON.parse(savedProfile);
+
+        const parsedProfile = JSON.parse(savedProfile);
 
         setProfile(parsedProfile);
         setFormData(parsedProfile);
 
       } catch (error) {
-        console.error(
-          "Invalid saved profile:",
-          error
-        );
+
+        console.error("Invalid saved profile:", error);
+
       }
     }
 
-    // Get Firebase user
-    const unsubscribe =
-      onAuthStateChanged(
-        auth,
-        async (user) => {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (user) => {
 
-          if (!user) {
-            return;
+        if (!user) {
+
+          setLoading(false);
+          return;
+        }
+
+        try {
+
+          setLoading(true);
+
+          const response = await fetch(
+            `${API_URL}/users/${user.uid}`
+          );
+
+          if (!response.ok) {
+            throw new Error("Unable to load profile from database.");
           }
 
-          try {
+          const data = await response.json();
 
-            const response =
-              await fetch(
-                `${API_URL}/users/${user.uid}`
-              );
+          console.log("DATABASE PROFILE:", data);
 
-            const data =
-              await response.json();
-
-            console.log(
-              "PROFILE DATABASE RESPONSE:",
-              data
+          if (!data.success) {
+            throw new Error(
+              data.error || "Profile not found."
             );
+          }
 
-            if (
-              response.ok &&
-              data.success
-            ) {
+          // GET PHOTO FROM POSTGRESQL
 
-              /*
-               Only use a photo that was
-               uploaded to MindCare.
+          const databasePhoto =
+            data.photo_url || data.photo || "";
 
-               Firebase Google photo is ignored.
-              */
+          const uploadedPhoto =
+            typeof databasePhoto === "string"
+              ? databasePhoto
+              : "";
 
-              const databasePhoto =
-                data.photo_url || "";
+          const loadedProfile = {
 
-              const uploadedPhoto =
-                databasePhoto.startsWith(
-                  "data:image/"
-                )
-                  ? databasePhoto
-                  : "";
+            name:
+              data.name ||
+              user.displayName ||
+              "User",
 
-              const loadedProfile = {
-                name:
-                  data.name ||
-                  user.displayName ||
-                  "User",
+            email:
+              data.email ||
+              user.email ||
+              "user@example.com",
 
-                email:
-                  data.email ||
-                  user.email ||
-                  "user@example.com",
+            photo: uploadedPhoto
 
-                photo:
-                  uploadedPhoto
-              };
+          };
 
-              synchronizeProfile(
-                loadedProfile
-              );
+          // UPDATE UI AND LOCAL STORAGE
 
-            } else {
+          synchronizeProfile(loadedProfile);
 
-              const firebaseProfile = {
-                name:
-                  user.displayName ||
-                  "User",
+          console.log(
+            "Profile and photo loaded successfully."
+          );
 
-                email:
-                  user.email ||
-                  "user@example.com",
+        } catch (error) {
 
-                photo: ""
-              };
+          console.error("LOAD PROFILE ERROR:", error);
 
-              synchronizeProfile(
-                firebaseProfile
-              );
-            }
+          // KEEP CACHED PROFILE IF DATABASE IS UNAVAILABLE
 
-          } catch (error) {
+          const cachedProfile =
+            localStorage.getItem("mindcareProfile");
 
-            console.error(
-              "Error loading profile:",
-              error
-            );
-
-            /*
-             Do not block the page if
-             PostgreSQL is temporarily slow.
-            */
+          if (!cachedProfile) {
 
             const fallbackProfile = {
+
               name:
-                user.displayName ||
-                "User",
+                user.displayName || "User",
 
               email:
-                user.email ||
-                "user@example.com",
+                user.email || "user@example.com",
 
               photo: ""
+
             };
 
-            synchronizeProfile(
-              fallbackProfile
-            );
+            setProfile(fallbackProfile);
+            setFormData(fallbackProfile);
           }
+
+        } finally {
+
+          setLoading(false);
+
         }
-      );
+      }
+    );
 
     return () => unsubscribe();
 
   }, []);
+
 
   // =========================================
   // HANDLE TEXT INPUT
@@ -206,47 +191,33 @@ function Profile() {
 
   const handleChange = (event) => {
 
-    const {
-      name,
-      value
-    } = event.target;
+    const { name, value } = event.target;
 
-    setFormData(
-      (previous) => ({
-        ...previous,
-        [name]: value
-      })
-    );
+    setFormData((previous) => ({
+      ...previous,
+      [name]: value
+    }));
   };
 
+
   // =========================================
-  // HANDLE PHOTO
+  // HANDLE PROFILE PHOTO
   // =========================================
 
   const handlePhotoChange = (event) => {
 
-    const file =
-      event.target.files[0];
+    const file = event.target.files[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
-    if (
-      !file.type.startsWith("image/")
-    ) {
+    if (!file.type.startsWith("image/")) {
 
-      setMessage(
-        "Please select an image file."
-      );
+      setMessage("Please select an image file.");
 
       return;
     }
 
-    if (
-      file.size >
-      2 * 1024 * 1024
-    ) {
+    if (file.size > 2 * 1024 * 1024) {
 
       setMessage(
         "Please choose an image smaller than 2 MB."
@@ -255,19 +226,23 @@ function Profile() {
       return;
     }
 
-    const reader =
-      new FileReader();
+    const reader = new FileReader();
 
     reader.onload = () => {
 
-      setFormData(
-        (previous) => ({
-          ...previous,
-          photo: reader.result
-        })
-      );
+      setFormData((previous) => ({
+        ...previous,
+        photo: reader.result
+      }));
 
-      setMessage("");
+      setMessage("Photo selected. Click Save Changes to save it.");
+
+    };
+
+    reader.onerror = () => {
+
+      setMessage("Unable to read the selected image.");
+
     };
 
     reader.readAsDataURL(file);
@@ -275,173 +250,123 @@ function Profile() {
     event.target.value = "";
   };
 
+
   // =========================================
-  // SAVE PROFILE
+  // SAVE PROFILE TO POSTGRESQL
   // =========================================
 
   const handleSave = async () => {
 
-    const user =
-      auth.currentUser;
+    const user = auth.currentUser;
 
     if (!user) {
 
-      setMessage(
-        "Please log in first."
-      );
+      setMessage("Please log in first.");
 
       return;
     }
 
-    const name =
-      formData.name.trim();
+    const name = formData.name.trim();
 
-    const email =
-      formData.email.trim();
+    const email = formData.email.trim();
 
     if (!name) {
 
-      setMessage(
-        "Please enter your name."
-      );
+      setMessage("Please enter your name.");
 
       return;
     }
 
     if (!email) {
 
-      setMessage(
-        "Please enter your email."
-      );
+      setMessage("Please enter your email.");
 
       return;
     }
 
-    // =========================================
-    // CREATE UPDATED PROFILE
-    // =========================================
-
-    const updatedProfile = {
-      name: name,
-      email: email,
-      photo: formData.photo || ""
-    };
-
-    // =========================================
-    // UPDATE UI IMMEDIATELY
-    // =========================================
-
-    setProfile(updatedProfile);
-    setFormData(updatedProfile);
-
-    // =========================================
-    // UPDATE SIDEBAR IMMEDIATELY
-    // =========================================
-
-    localStorage.setItem(
-      "mindcareProfile",
-      JSON.stringify(updatedProfile)
-    );
-
-    window.dispatchEvent(
-      new CustomEvent(
-        "mindcareProfileUpdated",
-        {
-          detail: updatedProfile
-        }
-      )
-    );
-
-    // =========================================
-    // CLOSE EDIT MODE IMMEDIATELY
-    // =========================================
-
-    setIsEditing(false);
-
-    // =========================================
-    // SHOW SUCCESS IMMEDIATELY
-    // =========================================
-
-    setMessage(
-      "Profile saved successfully 💙"
-    );
-
-    // =========================================
-    // SAVE TO DATABASE IN BACKGROUND
-    // =========================================
-
     setSaving(true);
+
+    setMessage("");
 
     try {
 
-      const response =
-        await fetch(
-          `${API_URL}/users`,
-          {
-            method: "POST",
+      // SEND PROFILE AND PHOTO TO BACKEND
 
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
+      const response = await fetch(
+        `${API_URL}/users`,
+        {
 
-            body: JSON.stringify({
-              firebase_uid:
-                user.uid,
+          method: "POST",
 
-              name:
-                name,
+          headers: {
+            "Content-Type": "application/json"
+          },
 
-              email:
-                email,
+          body: JSON.stringify({
 
-              photo_url:
-                formData.photo || ""
-            })
-          }
-        );
+            firebase_uid: user.uid,
 
-      const data =
-        await response.json();
+            name: name,
 
-      console.log(
-        "PROFILE SAVE RESPONSE:",
-        data
+            email: email,
+
+            photo_url: formData.photo || ""
+
+          })
+
+        }
       );
 
-      if (!response.ok) {
+      const data = await response.json();
+
+      console.log("PROFILE SAVE RESPONSE:", data);
+
+      if (!response.ok || data.success === false) {
 
         throw new Error(
-          data.error ||
-          "Failed to save profile"
+          data.error || "Failed to save profile."
         );
       }
 
+      // UPDATE PROFILE ONLY AFTER DATABASE SUCCESS
+
+      const updatedProfile = {
+
+        name: name,
+
+        email: email,
+
+        photo: formData.photo || ""
+
+      };
+
+      synchronizeProfile(updatedProfile);
+
+      setIsEditing(false);
+
+      setMessage(
+        "Profile saved successfully 💙"
+      );
+
       console.log(
-        "Profile saved to PostgreSQL successfully"
+        "Profile and photo saved to PostgreSQL successfully."
       );
 
     } catch (error) {
 
-      console.error(
-        "Background profile save error:",
-        error
-      );
-
-      /*
-       The UI has already changed.
-       Only database saving failed.
-      */
+      console.error("PROFILE SAVE ERROR:", error);
 
       setMessage(
-        "Profile updated, but database save failed."
+        error.message || "Unable to save profile."
       );
 
     } finally {
 
       setSaving(false);
+
     }
   };
+
 
   // =========================================
   // CANCEL EDITING
@@ -454,37 +379,27 @@ function Profile() {
     setIsEditing(false);
 
     setMessage("");
+
   };
 
+
   // =========================================
-  // REMOVE PHOTO
+  // REMOVE PROFILE PHOTO
   // =========================================
 
   const removePhoto = () => {
 
-    const updatedProfile = {
-      ...formData,
+    setFormData((previous) => ({
+      ...previous,
       photo: ""
-    };
+    }));
 
-    setFormData(updatedProfile);
-
-    setProfile(updatedProfile);
-
-    localStorage.setItem(
-      "mindcareProfile",
-      JSON.stringify(updatedProfile)
+    setMessage(
+      "Photo removed. Click Save Changes to confirm."
     );
 
-    window.dispatchEvent(
-      new CustomEvent(
-        "mindcareProfileUpdated",
-        {
-          detail: updatedProfile
-        }
-      )
-    );
   };
+
 
   // =========================================
   // LOGOUT
@@ -492,44 +407,39 @@ function Profile() {
 
   const handleLogout = async () => {
 
-    const confirmLogout =
-      window.confirm(
-        "Are you sure you want to logout?"
-      );
+    const confirmLogout = window.confirm(
+      "Are you sure you want to logout?"
+    );
 
-    if (!confirmLogout) {
-      return;
-    }
+    if (!confirmLogout) return;
 
     try {
 
       await signOut(auth);
 
-      localStorage.removeItem(
-        "mindcareLoggedIn"
-      );
+      localStorage.removeItem("mindcareLoggedIn");
 
-      localStorage.removeItem(
-        "mindcareProfile"
-      );
+      // Profile photo is stored in PostgreSQL.
+      // Removing the local cache will not delete the database photo.
+
+      localStorage.removeItem("mindcareProfile");
 
       window.location.href = "/";
 
     } catch (error) {
 
-      console.error(
-        "Logout error:",
-        error
-      );
+      console.error("LOGOUT ERROR:", error);
 
       setMessage(
         "Unable to logout. Please try again."
       );
+
     }
   };
 
+
   // =========================================
-  // GET LETTER FROM GMAIL
+  // GET INITIAL FROM EMAIL
   // =========================================
 
   const getInitial = () => {
@@ -540,70 +450,57 @@ function Profile() {
       auth.currentUser?.email ||
       "";
 
-    const cleanEmail =
-      email.trim();
+    if (!email.trim()) return "U";
 
-    if (!cleanEmail) {
-      return "U";
-    }
+    const emailName = email.trim().split("@")[0];
 
-    const emailName =
-      cleanEmail.split("@")[0];
-
-    if (!emailName) {
-      return "U";
-    }
-
-    return emailName
-      .charAt(0)
-      .toUpperCase();
+    return emailName.charAt(0).toUpperCase() || "U";
   };
+
 
   // =========================================
   // UI
   // =========================================
 
   return (
+
     <div className="profile-page">
 
-      {/* =====================================
-          HEADER
-      ===================================== */}
+      {/* HEADER */}
 
       <div className="profile-header">
 
         <div>
 
-          <h1>
-            My Profile
-          </h1>
+          <h1>My Profile</h1>
 
           <p>
-            Manage your personal
-            information and account
-            details.
+            Manage your personal information and account details.
           </p>
 
         </div>
 
         {!isEditing && (
+
           <button
             className="edit-profile-btn"
-            onClick={() =>
-              setIsEditing(true)
-            }
+            onClick={() => {
+              setIsEditing(true);
+              setMessage("");
+            }}
           >
             ✏️ Edit Profile
           </button>
+
         )}
 
       </div>
 
-      {/* =====================================
-          MESSAGE
-      ===================================== */}
+
+      {/* MESSAGE */}
 
       {message && (
+
         <p
           className="mood-message"
           style={{
@@ -613,17 +510,15 @@ function Profile() {
         >
           {message}
         </p>
+
       )}
 
-      {/* =====================================
-          PROFILE CARD
-      ===================================== */}
+
+      {/* PROFILE CARD */}
 
       <div className="profile-card">
 
-        {/* ===================================
-            PROFILE PHOTO
-        =================================== */}
+        {/* PROFILE PHOTO */}
 
         <div className="profile-photo-section">
 
@@ -634,6 +529,9 @@ function Profile() {
               <img
                 src={formData.photo}
                 alt="Profile"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
               />
 
             ) : (
@@ -646,9 +544,11 @@ function Profile() {
 
           </div>
 
+
           {/* PHOTO ACTIONS */}
 
           {isEditing && (
+
             <div className="photo-actions">
 
               <label
@@ -662,38 +562,38 @@ function Profile() {
                 id="profile-photo"
                 type="file"
                 accept="image/*"
-                onChange={
-                  handlePhotoChange
-                }
+                onChange={handlePhotoChange}
                 hidden
               />
 
               {formData.photo && (
+
                 <button
                   type="button"
                   className="remove-photo-btn"
-                  onClick={
-                    removePhoto
-                  }
+                  onClick={removePhoto}
                 >
                   Remove
                 </button>
+
               )}
 
             </div>
+
           )}
 
           {!isEditing && (
+
             <p className="photo-help">
               Profile picture
             </p>
+
           )}
 
         </div>
 
-        {/* ===================================
-            PROFILE INFORMATION
-        =================================== */}
+
+        {/* PROFILE INFORMATION */}
 
         <div className="profile-information">
 
@@ -701,21 +601,15 @@ function Profile() {
 
           <div className="form-group">
 
-            <label>
-              Full Name
-            </label>
+            <label>Full Name</label>
 
             {isEditing ? (
 
               <input
                 type="text"
                 name="name"
-                value={
-                  formData.name
-                }
-                onChange={
-                  handleChange
-                }
+                value={formData.name}
+                onChange={handleChange}
                 placeholder="Enter your name"
               />
 
@@ -729,25 +623,20 @@ function Profile() {
 
           </div>
 
+
           {/* EMAIL */}
 
           <div className="form-group">
 
-            <label>
-              Email Address
-            </label>
+            <label>Email Address</label>
 
             {isEditing ? (
 
               <input
                 type="email"
                 name="email"
-                value={
-                  formData.email
-                }
-                onChange={
-                  handleChange
-                }
+                value={formData.email}
+                onChange={handleChange}
                 placeholder="Enter your email"
               />
 
@@ -761,19 +650,16 @@ function Profile() {
 
           </div>
 
+
           {/* ACCOUNT TYPE */}
 
           <div className="form-group">
 
-            <label>
-              Account Type
-            </label>
+            <label>Account Type</label>
 
             <div className="profile-value account-type">
 
-              <span>
-                🌿
-              </span>
+              <span>🌿</span>
 
               MindCare Wellness User
 
@@ -781,45 +667,46 @@ function Profile() {
 
           </div>
 
+
           {/* SAVE / CANCEL */}
 
           {isEditing && (
+
             <div className="profile-buttons">
 
               <button
                 type="button"
                 className="save-profile-btn"
-                onClick={
-                  handleSave
-                }
+                onClick={handleSave}
                 disabled={saving}
               >
+
                 {saving
                   ? "Saving..."
                   : "✓ Save Changes"}
+
               </button>
+
 
               <button
                 type="button"
                 className="cancel-profile-btn"
-                onClick={
-                  handleCancel
-                }
+                onClick={handleCancel}
                 disabled={saving}
               >
                 Cancel
               </button>
 
             </div>
+
           )}
 
         </div>
 
       </div>
 
-      {/* =====================================
-          PRIVACY CARD
-      ===================================== */}
+
+      {/* PRIVACY CARD */}
 
       <div className="privacy-card">
 
@@ -829,38 +716,28 @@ function Profile() {
 
         <div>
 
-          <h3>
-            Your Privacy Matters
-          </h3>
+          <h3>Your Privacy Matters</h3>
 
           <p>
-            Your profile information
-            is associated with your
-            secure account and stored
-            in the MindCare database.
-            MindCare AI is designed
-            to provide general wellness
-            support and is not a
-            substitute for professional
-            medical care.
+            Your profile information is associated with your
+            secure account and stored in the MindCare database.
+            MindCare AI provides general wellness support and
+            is not a substitute for professional medical care.
           </p>
 
         </div>
 
       </div>
 
-      {/* =====================================
-          LOGOUT
-      ===================================== */}
+
+      {/* LOGOUT */}
 
       <div className="logout-section">
 
         <button
           type="button"
           className="logout-btn"
-          onClick={
-            handleLogout
-          }
+          onClick={handleLogout}
         >
           🚪 Logout
         </button>
@@ -868,6 +745,7 @@ function Profile() {
       </div>
 
     </div>
+
   );
 }
 
