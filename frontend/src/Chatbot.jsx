@@ -15,7 +15,75 @@ const welcomeMessage = {
     "Hi! I'm MindCare AI 💙 I'm here to listen and support your general wellness. How are you feeling today?"
 };
 
-function Chatbot() {
+
+/* =========================
+   EMERGENCY SETTINGS
+========================= */
+
+// Time (milliseconds) the user can read the caring message
+// before being taken to the Safety Support page.
+// Set to 0 to go there instantly.
+const EMERGENCY_REDIRECT_DELAY_MS = 1500;
+
+// Checked in the browser BEFORE the message is sent, so the
+// redirect is instant and works even if the backend is slow or
+// not running. The backend (safety.py) checks again as well.
+const EMERGENCY_WORDS = [
+  "suicide",
+  "suicidal",
+  "kill myself",
+  "killing myself",
+  "kill me",
+  "end my life",
+  "end it all",
+  "ending it all",
+  "want to die",
+  "wanna die",
+  "wish i was dead",
+  "wish i were dead",
+  "better off dead",
+  "better off without me",
+  "feel like dying",
+  "don't want to live",
+  "do not want to live",
+  "don't want to be alive",
+  "no reason to live",
+  "can't go on",
+  "cannot go on",
+  "can't take it anymore",
+  "self harm",
+  "self-harm",
+  "hurt myself",
+  "harm myself",
+  "cut myself",
+  "hang myself",
+  "overdose",
+  "emergency",
+  "in danger"
+];
+
+const normalizeText = (text) =>
+  text
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u02BC`]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const looksLikeEmergency = (text) => {
+
+  const lower =
+    normalizeText(text);
+
+  return EMERGENCY_WORDS.some(
+    (word) => lower.includes(word)
+  );
+};
+
+const emergencyFallbackMessage =
+  "I'm really sorry you're feeling this way. You deserve support right now. I'm opening Safety Support so you can reach help quickly. Please contact a trusted person or your local emergency services.";
+
+
+function Chatbot({ onEmergency }) {
 
   const [messages, setMessages] =
     useState([welcomeMessage]);
@@ -39,6 +107,9 @@ function Chatbot() {
   const recognitionRef =
     useRef(null);
 
+  const redirectTimerRef =
+    useRef(null);
+
 
   /* =========================
      AUTO SCROLL
@@ -51,6 +122,62 @@ function Chatbot() {
     });
 
   }, [messages, loading]);
+
+
+  /* =========================
+     GO TO SAFETY SUPPORT
+  ========================= */
+
+  const goToSafetySupport = () => {
+
+    console.log(
+      "MindCare: emergency detected. onEmergency connected:",
+      typeof onEmergency === "function"
+    );
+
+    // Stop speech if currently playing
+    if (
+      "speechSynthesis" in window
+    ) {
+      window.speechSynthesis.cancel();
+    }
+
+    // Stop voice recognition
+    if (
+      recognitionRef.current
+    ) {
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.log(
+          "Recognition already stopped."
+        );
+      }
+    }
+
+    if (!onEmergency) {
+
+      console.warn(
+        "Chatbot: onEmergency is missing. In App.jsx use " +
+        "<Chatbot onEmergency={() => setPage(\"safety\")} />"
+      );
+
+      return;
+    }
+
+    if (redirectTimerRef.current) {
+      clearTimeout(
+        redirectTimerRef.current
+      );
+    }
+
+    redirectTimerRef.current =
+      setTimeout(() => {
+
+        onEmergency();
+
+      }, EMERGENCY_REDIRECT_DELAY_MS);
+  };
 
 
   /* =========================
@@ -96,6 +223,29 @@ function Chatbot() {
       ]);
 
       setInput("");
+
+
+      // -----------------------------------------
+      // EMERGENCY: GO STRAIGHT TO SAFETY SUPPORT
+      // -----------------------------------------
+
+      if (looksLikeEmergency(text)) {
+
+        setMessages((previous) => [
+          ...previous,
+          {
+            role: "assistant",
+            content:
+              emergencyFallbackMessage,
+            type: "safety"
+          }
+        ]);
+
+        goToSafetySupport();
+
+        return;
+      }
+
 
       setLoading(true);
 
@@ -165,6 +315,16 @@ function Chatbot() {
           ...previous,
           assistantMessage
         ]);
+
+
+        // -----------------------------------------
+        // EMERGENCY: GO TO SAFETY SUPPORT
+        // -----------------------------------------
+
+        if (data.type === "safety") {
+
+          goToSafetySupport();
+        }
 
       } catch (error) {
 
@@ -426,6 +586,15 @@ function Chatbot() {
 
     return () => {
 
+      // Cancel a pending emergency redirect timer
+      if (redirectTimerRef.current) {
+
+        clearTimeout(
+          redirectTimerRef.current
+        );
+      }
+
+
       // Stop speech
       if (
         "speechSynthesis" in window
@@ -629,6 +798,53 @@ function Chatbot() {
                     >
                       🔊 Listen
                     </button>
+
+                  )}
+
+
+                  {/* SAFETY SUPPORT BUTTON */}
+
+                  {message.type ===
+                    "safety" &&
+                    onEmergency && (
+
+                    <button
+                      className="speak-button"
+                      onClick={() => {
+
+                        if (
+                          redirectTimerRef.current
+                        ) {
+                          clearTimeout(
+                            redirectTimerRef.current
+                          );
+                        }
+
+                        onEmergency();
+                      }}
+                    >
+                      🆘 Open Safety Support
+                    </button>
+
+                  )}
+
+
+                  {message.type ===
+                    "safety" &&
+                    !onEmergency && (
+
+                    <small
+                      style={{
+                        color: "#ef4444",
+                        display: "block",
+                        marginTop: "6px"
+                      }}
+                    >
+                      ⚠️ Safety Support is not connected yet. In
+                      App.jsx change &lt;Chatbot /&gt; to
+                      &lt;Chatbot onEmergency=
+                      {"{() => setPage(\"safety\")}"} /&gt;
+                    </small>
 
                   )}
 

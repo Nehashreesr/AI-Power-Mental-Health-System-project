@@ -597,7 +597,7 @@ function App() {
         )}
 
         {page === "chat" && (
-          <Chatbot />
+          <Chatbot onEmergency={() => setPage("safety")}/>
         )}
 
         {page === "mood" && (

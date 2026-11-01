@@ -4,9 +4,9 @@ import uuid
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-from model import generate_response
+from model import generate_response, warm_up_model
 from safety import check_crisis, crisis_response
-from voice_emotion import predict_emotion
+from voice_emotion import predict_emotion, preload_emotion_model
 
 # PostgreSQL
 from database import get_db_connection
@@ -19,6 +19,11 @@ from database import get_db_connection
 app = Flask(__name__)
 
 CORS(app)
+
+
+# Load AI models in the background so the first requests are fast
+warm_up_model()
+preload_emotion_model()
 
 
 # =====================================================
@@ -1320,7 +1325,8 @@ def predict_voice():
         return jsonify({
             "success": True,
             "emotion": emotion,
-            "confidence": confidence
+            "confidence": confidence,
+            "scores": result.get("scores", {})
         })
 
     except Exception as e:
